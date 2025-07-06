@@ -16,7 +16,7 @@ export class AuthController {
 
   @Post('facebook')
   loginFacebook(@Body() body: LoginFacebookDto) {
-    return this.authService.loginFacebook(body.playerId, body.fbUserId);
+    return this.authService.loginFacebook(body.playerId, body.fbAccessToken);
   }
 
   @UseGuards(JwtAuthGuard)

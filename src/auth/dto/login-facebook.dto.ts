@@ -6,6 +6,5 @@ export class LoginFacebookDto {
   playerId: string;
 
   @IsString()
-  @Length(4, 128)
-  fbUserId: string;
+  fbAccessToken: string;
 }

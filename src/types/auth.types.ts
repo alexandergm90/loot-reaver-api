@@ -1,0 +1,15 @@
+export interface FacebookPictureData {
+  height: number;
+  is_silhouette: boolean;
+  url: string;
+  width: number;
+}
+
+export interface FacebookProfile {
+  id: string;
+  name?: string;
+  email?: string;
+  picture?: {
+    data: FacebookPictureData;
+  };
+}

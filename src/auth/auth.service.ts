@@ -1,6 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
+import axios, { AxiosError } from 'axios';
+import { FacebookProfile } from '../types/auth.types';
 
 @Injectable()
 export class AuthService {
@@ -40,7 +42,10 @@ export class AuthService {
     return this.createJwt(user);
   }
 
-  async loginFacebook(playerId: string, fbUserId: string) {
+  async loginFacebook(playerId: string, fbAccessToken: string) {
+    const fbProfile = await this.verifyFacebookAccessToken(fbAccessToken);
+    const fbUserId = fbProfile.id;
+
     const existingFbAuth = await this.prisma.authProvider.findUnique({
       where: {
         provider_providerId: {
@@ -118,5 +123,31 @@ export class AuthService {
     return {
       access_token: this.jwt.sign(payload),
     };
+  }
+
+  private async verifyFacebookAccessToken(
+    accessToken: string,
+  ): Promise<FacebookProfile> {
+    try {
+      const response = await axios.get<FacebookProfile>(
+        'https://graph.facebook.com/me',
+        {
+          params: {
+            access_token: accessToken,
+            fields: 'id,name,email,picture.type(large)',
+          },
+        },
+      );
+
+      return response.data;
+    } catch (error) {
+      const err = error as AxiosError;
+
+      console.error(
+        '[Facebook Token Error]',
+        err.response?.data || err.message,
+      );
+      throw new UnauthorizedException('Invalid Facebook token');
+    }
   }
 }
