@@ -13,12 +13,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum ItemSlot {
+  head
+  chest
+  hands
+  feet
+  weapon
+}
+
 model User {
-  id            String         @id @default(uuid())
-  createdAt     DateTime       @default(now())
-  displayName   String?
-  avatarUrl     String?
+  id          String    @id @default(uuid())
+  createdAt   DateTime  @default(now())
+  lastLogin   DateTime?
+  bannedUntil DateTime?
+  isTester    Boolean   @default(false)
+  settings    Json?
+  region      String?
+
   authProviders AuthProvider[]
+  characters    Character[]
 }
 
 model AuthProvider {
@@ -30,4 +43,131 @@ model AuthProvider {
   createdAt  DateTime @default(now())
 
   @@unique([provider, providerId])
+}
+
+model Character {
+  id     String @id @default(uuid())
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  name         String  @unique
+  title        String
+  level        Int     @default(1)
+  experience   Int     @default(0)
+  lootScore    Int     @default(0)
+  hasCharacter Boolean @default(false)
+
+  trait     String
+  createdAt DateTime @default(now())
+
+  appearance   CharacterAppearance?
+  resources    CharacterResources?
+  stats        CharacterStats?
+  items        CharacterItem[]
+  achievements CharacterAchievement[]
+
+  @@index([userId])
+}
+
+model CharacterAppearance {
+  id          String    @id @default(uuid())
+  character   Character @relation(fields: [characterId], references: [id])
+  characterId String    @unique
+
+  gender    String
+  skinTone  String
+  hair      String
+  hairColor String
+  eyes      String
+  mouth     String
+  beard     String?
+  markings  String?
+
+  @@index([characterId])
+}
+
+model ItemTemplate {
+  id        String   @id @default(uuid())
+  code      String   @unique // e.g., "wooden_sword"
+  name      String
+  rarity    String
+  slot      ItemSlot
+  baseStats Json
+  iconUrl   String
+
+  CharacterItem CharacterItem[]
+}
+
+model CharacterItem {
+  id          String    @id @default(uuid())
+  character   Character @relation(fields: [characterId], references: [id])
+  characterId String
+
+  template   ItemTemplate @relation(fields: [templateId], references: [id])
+  templateId String
+
+  slot          ItemSlot
+  equipped      Boolean  @default(false)
+  durability    Int      @default(100)
+  socketedRunes Json?
+  bonuses       Json? // dynamic modifiers
+
+  createdAt DateTime @default(now())
+
+  @@index([characterId])
+}
+
+model CharacterResources {
+  id          String    @id @default(uuid())
+  character   Character @relation(fields: [characterId], references: [id])
+  characterId String    @unique
+
+  gold         Int @default(0)
+  scrap        Int @default(0)
+  soulstones   Int @default(0)
+  pvpTokens    Int @default(0)
+  mirrorShards Int @default(0)
+
+  runes Int @default(0)
+
+  runesUpdatedAt      DateTime @default(now())
+  soulstonesUpdatedAt DateTime @default(now())
+  pvpUpdatedAt        DateTime @default(now())
+
+  @@index([characterId])
+}
+
+model CharacterStats {
+  id          String    @id @default(uuid())
+  character   Character @relation(fields: [characterId], references: [id])
+  characterId String    @unique
+
+  damageDealt     Int @default(0)
+  enemiesKilled   Int @default(0)
+  playersFought   Int @default(0)
+  resourcesGained Int @default(0)
+  questsCompleted Int @default(0)
+  dungeonRuns     Int @default(0)
+
+  @@index([characterId])
+}
+
+model CharacterAchievement {
+  id          String    @id @default(uuid())
+  character   Character @relation(fields: [characterId], references: [id])
+  characterId String
+
+  achievementId String // FK to Achievement table
+  progress      Int       @default(0)
+  unlockedAt    DateTime?
+
+  @@index([characterId])
+}
+
+model Achievement {
+  id          String @id @default(uuid())
+  code        String @unique // 'KILL_100_ENEMIES'
+  title       String
+  description String
+  goal        Int
 }
