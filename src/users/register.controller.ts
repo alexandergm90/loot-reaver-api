@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { RegisterService } from './register.service';
 import { RegisterCharacterDto } from './dto/register.dto';
-import { AuthenticatedRequest } from '../types/auth.types';
+import { AuthenticatedRequest } from '@/types/auth.types';
 
 @Controller('register')
 export class RegisterController {

@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CharacterDraft } from '@/types/character.types';
+import { CharacterTrait } from '@prisma/client';
 
 @Injectable()
 export class RegisterService {
@@ -28,7 +29,7 @@ export class RegisterService {
         user: { connect: { id: userId } },
         name: randomName,
         title,
-        trait,
+        trait: trait as CharacterTrait,
         hasCharacter: true,
 
         appearance: {
