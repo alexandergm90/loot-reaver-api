@@ -14,11 +14,29 @@ datasource db {
 }
 
 enum ItemSlot {
-  head
+  helmet
   chest
-  hands
+  glove
   feet
   weapon
+  shield
+  cape
+  ring
+  neck
+}
+
+enum ItemRarity {
+  common
+  uncommon
+  rare
+  epic
+  legendary
+}
+
+enum CharacterTrait {
+  warrior
+  scholar
+  scoundrel
 }
 
 model User {
@@ -57,8 +75,8 @@ model Character {
   lootScore    Int     @default(0)
   hasCharacter Boolean @default(false)
 
-  trait     String
-  createdAt DateTime @default(now())
+  trait     CharacterTrait
+  createdAt DateTime       @default(now())
 
   appearance   CharacterAppearance?
   resources    CharacterResources?
@@ -87,10 +105,10 @@ model CharacterAppearance {
 }
 
 model ItemTemplate {
-  id        String   @id @default(uuid())
-  code      String   @unique // e.g., "wooden_sword"
+  id        String     @id @default(uuid())
+  code      String     @unique // e.g., "wooden_sword"
   name      String
-  rarity    String
+  rarity    ItemRarity
   slot      ItemSlot
   baseStats Json
   iconUrl   String
