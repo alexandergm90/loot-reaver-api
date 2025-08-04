@@ -61,13 +61,23 @@ export class RegisterService {
         items: {
           create: [
             {
-              template: { connect: { code: 'starter_sword' } },
+              template: { connect: { code: 'basic_sword' } },
               slot: 'weapon',
               equipped: true,
             },
             {
-              template: { connect: { code: 'starter_chest' } },
+              template: { connect: { code: 'basic_chest' } },
               slot: 'chest',
+              equipped: true,
+            },
+            {
+              template: { connect: { code: 'basic_glove' } },
+              slot: 'glove',
+              equipped: true,
+            },
+            {
+              template: { connect: { code: 'basic_feet' } },
+              slot: 'feet',
               equipped: true,
             },
           ],
