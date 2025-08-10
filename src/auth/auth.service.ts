@@ -118,6 +118,54 @@ export class AuthService {
     }
   }
 
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        characters: {
+          include: {
+            appearance: true,
+            resources: true,
+            stats: true,
+            items: { include: { template: true } },
+          },
+        },
+      },
+    });
+
+    if (!user) throw new UnauthorizedException('User not found');
+
+    const character = user.characters[0] ?? null;
+
+    return {
+      id: user.id,
+      bannedUntil: user.bannedUntil,
+      isTester: user.isTester,
+      settings: user.settings,
+      region: user.region,
+      hasCharacter: Boolean(character),
+      character:
+        character
+          ? {
+              id: character.id,
+              name: character.name,
+              title: character.title,
+              level: character.level,
+              trait: character.trait,
+              appearance: character.appearance,
+              resources: character.resources,
+              stats: character.stats,
+              items: character.items.map((i) => ({
+                id: i.id,
+                slot: i.slot,
+                equipped: i.equipped,
+                template: i.template,
+              })),
+            }
+          : null,
+    };
+  }
+
   private createJwt(user: { id: string }) {
     const payload = { sub: user.id };
     return {

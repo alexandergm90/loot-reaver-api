@@ -4,6 +4,7 @@ import { UseGuards, Get, Req } from '@nestjs/common';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { LoginGuestDto } from './dto/login-guest.dto';
 import { LoginFacebookDto } from './dto/login-facebook.dto';
+import { AuthenticatedRequest } from '@/types/auth.types';
 
 @Controller('auth')
 export class AuthController {
@@ -21,9 +22,7 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  getProfile(@Req() req: { user: { userId: string } }) {
-    return {
-      userId: req.user.userId,
-    };
+  getProfile(@Req() req: AuthenticatedRequest) {
+    return this.authService.getMe(req.user.id);
   }
 }

@@ -20,7 +20,6 @@ export class RegisterController {
     @Body() body: RegisterCharacterDto,
     @Req() req: AuthenticatedRequest,
   ) {
-    console.log("REQUEST : ",req.user)
     const userId = req.user?.id;
     if (!userId) throw new ForbiddenException('Unauthorized');
 
