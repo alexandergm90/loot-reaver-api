@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { CharacterDraft } from '@/types/character.types';
-import { CharacterTrait } from '@prisma/client';
+import { CharacterTrait } from './character-trait.enum';
 
 @Injectable()
 export class RegisterService {
@@ -20,7 +20,7 @@ export class RegisterService {
       throw new BadRequestException('Character already exists');
     }
 
-    // Generate random name + title (you can replace this logic)
+    // Generate random name + title
     const randomName = 'Wanderer' + Math.floor(Math.random() * 100000);
     const title = 'The Untested';
 
@@ -49,8 +49,14 @@ export class RegisterService {
           create: {
             gold: 100,
             scrap: 50,
-            runes: 5,
-            mirrorShards: 1,
+            // Initialize rune system: base 4 capacity, full runes on start
+            runeCapacityBase: 4,
+            runeCapacityBonus: 0,
+            runeRegenBaseSeconds: 1800,
+            runeRegenMultiplier: 1000,
+            runeRegenAddSeconds: 0,
+            runes: 4,
+            mirrorShards: 0,
           },
         },
 

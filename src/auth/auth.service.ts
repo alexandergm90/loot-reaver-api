@@ -1,8 +1,8 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { PrismaService } from '@/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import axios, { AxiosError } from 'axios';
-import { FacebookProfile } from '../types/auth.types';
+import { FacebookProfile } from '@/types/auth.types';
 
 @Injectable()
 export class AuthService {

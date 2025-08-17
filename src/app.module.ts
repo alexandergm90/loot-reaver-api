@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { RegisterModule } from '@/users/register.module';
+import { PlayerModule } from '@/player/player.module';
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { RegisterModule } from '@/users/register.module';
     PrismaModule,
     AuthModule,
     RegisterModule,
+    PlayerModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '7d' },

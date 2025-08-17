@@ -147,6 +147,14 @@ model CharacterResources {
   mirrorShards Int @default(0)
 
   runes Int @default(0)
+  // Base capacity for runes (default 4) and any bonuses (premium, skills, etc.)
+  runeCapacityBase  Int      @default(4)
+  runeCapacityBonus Int      @default(0)
+  // Base regen interval in seconds (default 1800 = 30 min), multiplicative modifier in milli-units (1000 = 1.0x),
+  // and additive modifier in seconds (can be negative)
+  runeRegenBaseSeconds Int   @default(1800)
+  runeRegenMultiplier  Int   @default(1000)
+  runeRegenAddSeconds  Int   @default(0)
 
   runesUpdatedAt      DateTime @default(now())
   soulstonesUpdatedAt DateTime @default(now())
