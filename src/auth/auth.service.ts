@@ -127,7 +127,7 @@ export class AuthService {
             appearance: true,
             resources: true,
             stats: true,
-            items: { include: { template: true } },
+            items: { where: { equipped: true }, include: { template: true } },
           },
         },
       },
