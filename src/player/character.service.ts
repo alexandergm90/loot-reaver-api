@@ -31,7 +31,7 @@ export class CharacterService {
       trait: character.trait,
       appearance: character.appearance,
       resources: character.resources,
-      equipped: character.items.map((i) => ({
+      items: character.items.map((i) => ({
         id: i.id,
         slot: i.slot,
         template: i.template,
