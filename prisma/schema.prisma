@@ -83,6 +83,8 @@ model Character {
   stats        CharacterStats?
   items        CharacterItem[]
   achievements CharacterAchievement[]
+  dungeonRuns  DungeonRun[]
+  dungeonProgress PlayerDungeonProgress[]
 
   @@index([userId])
 }
@@ -196,4 +198,82 @@ model Achievement {
   title       String
   description String
   goal        Int
+}
+
+// Combat System Models
+
+model Enemy {
+  id   String @id @default(uuid())
+  name String
+  code String @unique // e.g., "goblin_warrior"
+  hp   Int    // base health points
+  atk  Int    // base attack damage
+}
+
+model Dungeon {
+  id         String @id @default(uuid())
+  name       String
+  wavesCount Int
+  waveComp   Json   // [{"enemies":[{"id":"abc123","count":1}]},{"enemies":[{"id":"123bac","count":2},{"id":"1231231","count":1}]}]
+
+  // Relations
+  scaling   DungeonScaling?
+  rewards   DungeonReward?
+  runs      DungeonRun[]
+  progress  PlayerDungeonProgress[]
+}
+
+model DungeonScaling {
+  id         String  @id @default(uuid())
+  dungeon    Dungeon @relation(fields: [dungeonId], references: [id])
+  dungeonId  String  @unique
+
+  hpGrowth   Float // e.g., 0.10 = +10% per level
+  atkGrowth  Float // e.g., 0.08 = +8% per level
+  defGrowth  Float // e.g., 0.05 = +5% per level
+  lootGrowth Float? // e.g., 0.20 = +20% per level (optional)
+}
+
+model DungeonReward {
+  id         String  @id @default(uuid())
+  dungeon    Dungeon @relation(fields: [dungeonId], references: [id])
+  dungeonId  String  @unique
+
+  baseGoldMin Int
+  baseGoldMax Int
+  baseXpMin   Int
+  baseXpMax   Int
+  dropsJson   Json? // simple drops for item ids and weights
+}
+
+model DungeonRun {
+  id         String   @id @default(uuid())
+  character  Character @relation(fields: [characterId], references: [id])
+  characterId String
+  dungeon    Dungeon  @relation(fields: [dungeonId], references: [id])
+  dungeonId  String
+  level      Int
+
+  outcome      String // "victory" | "defeat"
+  turns        Int
+  rewardsJson  Json   // what was awarded
+  logCompactJson Json? // small array of events for playback/review
+
+  createdAt DateTime @default(now())
+
+  @@index([characterId])
+  @@index([dungeonId])
+}
+
+model PlayerDungeonProgress {
+  id         String    @id @default(uuid())
+  character  Character @relation(fields: [characterId], references: [id])
+  characterId String
+  dungeon    Dungeon   @relation(fields: [dungeonId], references: [id])
+  dungeonId  String
+
+  highestLevelCleared Int @default(0)
+
+  @@unique([characterId, dungeonId])
+  @@index([characterId])
 }
