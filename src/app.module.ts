@@ -7,6 +7,7 @@ import { ConfigModule } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { RegisterModule } from '@/users/register.module';
 import { PlayerModule } from '@/player/player.module';
+import { DungeonsModule } from './dungeons/dungeons.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { PlayerModule } from '@/player/player.module';
     AuthModule,
     RegisterModule,
     PlayerModule,
+    DungeonsModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '7d' },
