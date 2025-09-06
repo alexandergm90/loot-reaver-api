@@ -66,6 +66,7 @@ async function main() {
   const dungeons = [
     {
       name: 'Goblin Cave',
+      code: 'goblin_cave',
       wavesCount: 3,
       waveComp: [
         { enemies: [{ id: goblinWarrior!.id, count: 2 }] },
@@ -93,6 +94,7 @@ async function main() {
     },
     {
       name: 'Orc Stronghold',
+      code: 'orc_stronghold',
       wavesCount: 4,
       waveComp: [
         { enemies: [{ id: orcBrute!.id, count: 1 }] },
@@ -122,6 +124,7 @@ async function main() {
     },
     {
       name: 'Undead Crypt',
+      code: 'undead_crypt',
       wavesCount: 5,
       waveComp: [
         { enemies: [{ id: skeletonWarrior!.id, count: 1 }] },
@@ -160,6 +163,7 @@ async function main() {
       const dungeon = await prisma.dungeon.create({
         data: {
           name: dungeonData.name,
+          code: dungeonData.code,
           wavesCount: dungeonData.wavesCount,
           waveComp: dungeonData.waveComp,
         },

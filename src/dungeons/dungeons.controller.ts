@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { DungeonsService } from './dungeons.service';
 import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
-import { DungeonResponseDto } from './dto/dungeon-response.dto';
+import { DungeonListDto } from './dto/dungeon-list.dto';
 import { DungeonDetailsResponseDto } from './dto/dungeon-details.dto';
 import { DungeonDetailsQueryDto } from './dto/dungeon-details-query.dto';
 
@@ -11,7 +11,7 @@ export class DungeonsController {
   constructor(private readonly dungeonsService: DungeonsService) {}
 
   @Get()
-  async getDungeons(@Request() req): Promise<DungeonResponseDto[]> {
+  async getDungeons(@Request() req): Promise<DungeonListDto[]> {
     const characterId = req.user.characterId;
     return this.dungeonsService.getDungeons(characterId);
   }

@@ -1,20 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
-import { DungeonResponseDto } from './dto/dungeon-response.dto';
+import { DungeonListDto } from './dto/dungeon-list.dto';
 import { DungeonDetailsResponseDto } from './dto/dungeon-details.dto';
 
 @Injectable()
 export class DungeonsService {
   constructor(private prisma: PrismaService) {}
 
-  async getDungeons(characterId: string): Promise<DungeonResponseDto[]> {
+  async getDungeons(characterId: string): Promise<DungeonListDto[]> {
     const dungeons = await this.prisma.dungeon.findMany({
-      include: {
-        scaling: true,
-        rewards: true,
+      select: {
+        id: true,
+        name: true,
+        code: true,
         progress: {
           where: {
             characterId: characterId,
+          },
+          select: {
+            highestLevelCleared: true,
           },
         },
       },
@@ -23,21 +27,7 @@ export class DungeonsService {
     return dungeons.map((dungeon) => ({
       id: dungeon.id,
       name: dungeon.name,
-      wavesCount: dungeon.wavesCount,
-      waveComp: dungeon.waveComp as any[],
-      scaling: dungeon.scaling ? {
-        hpGrowth: dungeon.scaling.hpGrowth,
-        atkGrowth: dungeon.scaling.atkGrowth,
-        defGrowth: dungeon.scaling.defGrowth,
-        lootGrowth: dungeon.scaling.lootGrowth ?? undefined,
-      } : undefined,
-      rewards: dungeon.rewards ? {
-        baseGoldMin: dungeon.rewards.baseGoldMin,
-        baseGoldMax: dungeon.rewards.baseGoldMax,
-        baseXpMin: dungeon.rewards.baseXpMin,
-        baseXpMax: dungeon.rewards.baseXpMax,
-        dropsJson: dungeon.rewards.dropsJson,
-      } : undefined,
+      code: dungeon.code,
       highestLevelCleared: dungeon.progress[0]?.highestLevelCleared || 0,
       availableLevels: (dungeon.progress[0]?.highestLevelCleared || 0) + 1,
     }));

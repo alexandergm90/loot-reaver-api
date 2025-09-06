@@ -213,6 +213,7 @@ model Enemy {
 model Dungeon {
   id         String @id @default(uuid())
   name       String
+  code       String @unique // e.g., "goblin_cave", "spider_den"
   wavesCount Int
   waveComp   Json   // [{"enemies":[{"id":"abc123","count":1}]},{"enemies":[{"id":"123bac","count":2},{"id":"1231231","count":1}]}]
 
