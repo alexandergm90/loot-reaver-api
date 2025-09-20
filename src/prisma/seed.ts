@@ -93,8 +93,8 @@ async function main() {
       },
     },
     {
-      name: 'Orc Stronghold',
-      code: 'orc_stronghold',
+      name: 'Dark Sanctuary',
+      code: 'dark_sanctuary',
       wavesCount: 4,
       waveComp: [
         { enemies: [{ id: orcBrute!.id, count: 1 }] },
