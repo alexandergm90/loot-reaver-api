@@ -204,16 +204,29 @@ export class CombatService {
     if (player && enemies.length > 0) {
       // Player attacks first enemy
       const target = enemies[0];
+      const targetHpBefore = target.currentHp;
       const damage = this.calculateDamage(player.damage, target);
+      const targetHpAfter = Math.max(0, targetHpBefore - damage);
+      const isKill = targetHpAfter <= 0;
       
       actions.push({
         attackerId: player.id,
         targetId: target.id,
         damage,
         actionType: 'attack',
+        actionId: `player_attack_${roundNumber}_${Date.now()}`,
+        ability: 'basic_slash',
+        crit: false, // TODO: Implement crit logic
+        miss: false, // TODO: Implement miss logic
+        blocked: false, // TODO: Implement block logic
+        statusApplied: [], // TODO: Implement status effects
+        tags: ['melee', 'physical', 'basic'],
+        targetHpBefore,
+        targetHpAfter,
+        kill: isKill,
       });
 
-      target.currentHp = Math.max(0, target.currentHp - damage);
+      target.currentHp = targetHpAfter;
       if (target.currentHp <= 0) {
         target.isAlive = false;
       }
@@ -242,16 +255,29 @@ export class CombatService {
     const aliveEnemies = entities.filter(e => !e.isPlayer && e.isAlive);
     if (player && player.isAlive && aliveEnemies.length > 0) {
       const attackingEnemy = aliveEnemies[0];
+      const targetHpBefore = player.currentHp;
       const damage = this.calculateDamage(attackingEnemy.damage, player);
+      const targetHpAfter = Math.max(0, targetHpBefore - damage);
+      const isKill = targetHpAfter <= 0;
       
       actions.push({
         attackerId: attackingEnemy.id,
         targetId: player.id,
         damage,
         actionType: 'attack',
+        actionId: `enemy_attack_${roundNumber}_${Date.now()}`,
+        ability: 'basic_claw', // Default enemy ability
+        crit: false, // TODO: Implement crit logic
+        miss: false, // TODO: Implement miss logic
+        blocked: false, // TODO: Implement block logic
+        statusApplied: [], // TODO: Implement status effects
+        tags: ['melee', 'physical', 'enemy'],
+        targetHpBefore,
+        targetHpAfter,
+        kill: isKill,
       });
 
-      player.currentHp = Math.max(0, player.currentHp - damage);
+      player.currentHp = targetHpAfter;
       if (player.currentHp <= 0) {
         player.isAlive = false;
       }

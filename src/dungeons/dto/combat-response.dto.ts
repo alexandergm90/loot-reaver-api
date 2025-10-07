@@ -37,6 +37,46 @@ export class CombatActionDto {
 
   @IsString()
   actionType: 'attack' | 'defend' | 'special';
+
+  // Animation and FX tracking fields
+  @IsString()
+  actionId: string;
+
+  @IsString()
+  ability: string;
+
+  @IsOptional()
+  @IsBoolean()
+  crit?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  miss?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  blocked?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  statusApplied?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  tags?: string[];
+
+  // HP tracking for precise animation timing
+  @IsNumber()
+  targetHpBefore: number;
+
+  @IsNumber()
+  targetHpAfter: number;
+
+  @IsOptional()
+  @IsBoolean()
+  kill?: boolean;
 }
 
 export class CombatRoundDto {
