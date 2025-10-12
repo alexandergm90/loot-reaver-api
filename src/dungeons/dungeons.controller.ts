@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
 import { DungeonListDto } from './dto/dungeon-list.dto';
 import { DungeonDetailsResponseDto } from './dto/dungeon-details.dto';
 import { DungeonDetailsQueryDto } from './dto/dungeon-details-query.dto';
-import { CombatResultDto } from './dto/combat-response.dto';
+import { FrameCombatResultDto } from './dto/frame-combat-response.dto';
 
 @Controller('dungeons')
 @UseGuards(JwtAuthGuard)
@@ -42,7 +42,7 @@ export class DungeonsController {
     @Param('id') dungeonId: string,
     @Param('level') level: number,
     @Request() req,
-  ): Promise<CombatResultDto> {
+  ): Promise<FrameCombatResultDto> {
     const characterId = await this.getCharacterId(req.user.id);
     return this.combatService.runCombat(dungeonId, level, characterId);
   }
