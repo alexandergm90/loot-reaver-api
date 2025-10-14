@@ -1,13 +1,20 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
 import { 
-  FrameCombatResultDto, 
-  CombatRoundDto, 
-  CombatActionDto, 
-  CombatFrameDto,
-  CombatActorDto 
-} from './dto/frame-combat-response.dto';
-import { CombatEntity, CombatFrame, CombatAction, CombatRound, StatusEffect } from './types/combat.types';
+  LeanCombatResultDto, 
+  LeanRoundDto, 
+  LeanActionDto, 
+  LeanEndFrameDto,
+  LeanActorDto,
+  ActionFrameDto,
+  ActionResultDto,
+  StatusEffectDto,
+  StatusTickDto,
+  RoundEndFrameDto,
+  DeathFrameDto,
+  EndBattleFrameDto
+} from './dto/lean-combat-response.dto';
+import { CombatEntity, StatusEffect } from './types/combat.types';
 
 @Injectable()
 export class CombatService {
@@ -17,7 +24,7 @@ export class CombatService {
     dungeonId: string,
     level: number,
     characterId: string,
-  ): Promise<FrameCombatResultDto> {
+  ): Promise<LeanCombatResultDto> {
     // Get dungeon and validate level access
     const dungeon = await this.prisma.dungeon.findUnique({
       where: { id: dungeonId },
@@ -83,24 +90,25 @@ export class CombatService {
       })),
     ];
 
-    // Store initial HP values for actors display
-    const initialActorData = entities.map(e => ({
+    // Store initial actor data for lean format
+    const initialActorData: LeanActorDto[] = entities.map(e => ({
       id: e.id,
       name: e.name,
       code: e.code,
       isPlayer: e.isPlayer,
       maxHp: e.maxHp,
-      initialHp: e.currentHp,
+      startHp: e.currentHp,
+      statuses: [],
     }));
 
     // Run combat simulation
-    const rounds: CombatRoundDto[] = [];
+    const rounds: LeanRoundDto[] = [];
     let roundNumber = 1;
     const maxRounds = 50; // Prevent infinite loops
     const logId = `run_${Date.now()}`;
 
     while (roundNumber <= maxRounds) {
-      const round = this.simulateFrameRound(entities, roundNumber, logId);
+      const round = this.simulateLeanRound(entities, roundNumber, logId);
       rounds.push(round);
 
       // Check if combat is over
@@ -109,14 +117,14 @@ export class CombatService {
 
       if (!player?.isAlive) {
         // Player defeated
-        const result = this.createFrameCombatResult('defeat', roundNumber, rounds, logId, initialActorData);
+        const result = this.createLeanCombatResult('defeat', roundNumber, rounds, logId, initialActorData);
         return result;
       }
 
       if (aliveEnemies.length === 0) {
         // All enemies defeated - victory
         const rewards = this.calculateRewards(dungeon, level);
-        const result = this.createFrameCombatResult('victory', roundNumber, rounds, logId, initialActorData, rewards);
+        const result = this.createLeanCombatResult('victory', roundNumber, rounds, logId, initialActorData, rewards);
         return result;
       }
 
@@ -124,7 +132,7 @@ export class CombatService {
     }
 
     // Combat timeout (shouldn't happen with reasonable stats)
-    const result = this.createFrameCombatResult('defeat', maxRounds, rounds, logId, initialActorData);
+    const result = this.createLeanCombatResult('defeat', maxRounds, rounds, logId, initialActorData);
     return result;
   }
 
@@ -192,8 +200,8 @@ export class CombatService {
     });
   }
 
-  private simulateFrameRound(entities: CombatEntity[], roundNumber: number, logId: string): CombatRoundDto {
-    const actions: CombatActionDto[] = [];
+  private simulateLeanRound(entities: CombatEntity[], roundNumber: number, logId: string): LeanRoundDto {
+    const actions: LeanActionDto[] = [];
     const aliveEntities = entities.filter(e => e.isAlive);
 
     // Player always attacks first
@@ -201,25 +209,25 @@ export class CombatService {
     const enemies = aliveEntities.filter(e => !e.isPlayer);
 
     if (player && enemies.length > 0) {
-      const playerAction = this.createPlayerAction(player, enemies[0], roundNumber, logId);
+      const playerAction = this.createLeanPlayerAction(player, enemies[0], roundNumber, logId);
       actions.push(playerAction);
       
       // Apply the action effects
-      this.applyActionEffects(playerAction, entities);
+      this.applyLeanActionEffects(playerAction, entities);
     }
 
     // Only one enemy attacks back (the first alive enemy)
     const aliveEnemies = entities.filter(e => !e.isPlayer && e.isAlive);
     if (player && player.isAlive && aliveEnemies.length > 0) {
-      const enemyAction = this.createEnemyAction(aliveEnemies[0], player, roundNumber, logId);
+      const enemyAction = this.createLeanEnemyAction(aliveEnemies[0], player, roundNumber, logId);
       actions.push(enemyAction);
       
       // Apply the action effects
-      this.applyActionEffects(enemyAction, entities);
+      this.applyLeanActionEffects(enemyAction, entities);
     }
 
     // Generate end frames for this round
-    const endFrames = this.generateEndFrames(entities, roundNumber);
+    const endFrames = this.generateLeanEndFrames(entities, roundNumber);
 
     return {
       roundNumber,
@@ -228,45 +236,34 @@ export class CombatService {
     };
   }
 
-  private createPlayerAction(attacker: CombatEntity, target: CombatEntity, roundNumber: number, logId: string): CombatActionDto {
+  private createLeanPlayerAction(attacker: CombatEntity, target: CombatEntity, roundNumber: number, logId: string): LeanActionDto {
     const actionId = `player_attack_${roundNumber}_${logId}`;
-    const frames: CombatFrameDto[] = [];
     
-    // Attack frame
-    frames.push({ type: 'attack' });
-    
-    // Damage frame
+    // Calculate damage and effects
     const hpBefore = target.currentHp;
     const damage = this.calculateDamage(attacker.damage, target);
     const hpAfter = Math.max(0, hpBefore - damage);
     const isKill = hpAfter <= 0;
     
-    frames.push({
-      type: 'damage',
-      amount: damage,
-      crit: false,
-      hpBefore: { [target.id]: hpBefore },
-      hpAfter: { [target.id]: hpAfter },
-      kill: isKill,
-    });
-    
-    // Apply status effect (bleed for now)
+    // Check for status application
+    const statusApplied: StatusEffectDto[] = [];
     if (Math.random() < 0.3) { // 30% chance to apply bleed
-      frames.push({
-        type: 'status_apply',
-        targetId: target.id,
-        status: { id: 'bleed', stacks: 1, duration: 2 },
-      });
+      statusApplied.push({ id: 'bleed', stacks: 1, duration: 2 });
     }
     
-    // Death frame if killed
-    if (isKill) {
-      frames.push({
-        type: 'death',
-        targets: [target.id],
-        cause: 'basic_slash',
-      });
-    }
+    // Create single action frame with consolidated results
+    const actionFrame: ActionFrameDto = {
+      type: 'action',
+      results: [{
+        targetId: target.id,
+        amount: damage,
+        crit: false,
+        hpBefore,
+        hpAfter,
+        kill: isKill,
+        statusApplied: statusApplied.length > 0 ? statusApplied : undefined,
+      }],
+    };
     
     return {
       actionId,
@@ -275,40 +272,31 @@ export class CombatService {
       element: 'physical',
       targets: [target.id],
       tags: ['melee', 'physical', 'player'],
-      frames,
+      frames: [actionFrame],
     };
   }
 
-  private createEnemyAction(attacker: CombatEntity, target: CombatEntity, roundNumber: number, logId: string): CombatActionDto {
+  private createLeanEnemyAction(attacker: CombatEntity, target: CombatEntity, roundNumber: number, logId: string): LeanActionDto {
     const actionId = `enemy_attack_${roundNumber}_${logId}`;
-    const frames: CombatFrameDto[] = [];
     
-    // Attack frame
-    frames.push({ type: 'attack' });
-    
-    // Damage frame
+    // Calculate damage
     const hpBefore = target.currentHp;
     const damage = this.calculateDamage(attacker.damage, target);
     const hpAfter = Math.max(0, hpBefore - damage);
     const isKill = hpAfter <= 0;
     
-    frames.push({
-      type: 'damage',
-      amount: damage,
-      crit: false,
-      hpBefore: { [target.id]: hpBefore },
-      hpAfter: { [target.id]: hpAfter },
-      kill: isKill,
-    });
-    
-    // Death frame if killed
-    if (isKill) {
-      frames.push({
-        type: 'death',
-        targets: [target.id],
-        cause: 'basic_claw',
-      });
-    }
+    // Create single action frame with consolidated results
+    const actionFrame: ActionFrameDto = {
+      type: 'action',
+      results: [{
+        targetId: target.id,
+        amount: damage,
+        crit: false,
+        hpBefore,
+        hpAfter,
+        kill: isKill,
+      }],
+    };
     
     return {
       actionId,
@@ -317,63 +305,96 @@ export class CombatService {
       element: 'physical',
       targets: [target.id],
       tags: ['melee', 'physical', 'enemy'],
-      frames,
+      frames: [actionFrame],
     };
   }
 
-  private applyActionEffects(action: CombatActionDto, entities: CombatEntity[]): void {
-    // Find damage frame and apply HP changes
-    const damageFrame = action.frames.find(f => f.type === 'damage');
-    if (damageFrame) {
-      const hpAfter = damageFrame.hpAfter as Record<string, number>;
-      Object.entries(hpAfter).forEach(([targetId, newHp]) => {
-        const entity = entities.find(e => e.id === targetId);
-        if (entity) {
-          entity.currentHp = newHp;
-          if (newHp <= 0) {
-            entity.isAlive = false;
-          }
-        }
-      });
-    }
-    
-    // Apply status effects
+  private applyLeanActionEffects(action: LeanActionDto, entities: CombatEntity[]): void {
+    // Apply effects from the action frame
     action.frames.forEach(frame => {
-      if (frame.type === 'status_apply') {
-        const target = entities.find(e => e.id === frame.targetId);
-        if (target) {
-          const status = frame.status as StatusEffect;
-          target.statusEffects.set(status.id, status);
-        }
+      if (frame.type === 'action') {
+        frame.results.forEach(result => {
+          const entity = entities.find(e => e.id === result.targetId);
+          if (entity) {
+            // Apply HP changes
+            entity.currentHp = result.hpAfter;
+            if (result.hpAfter <= 0) {
+              entity.isAlive = false;
+            }
+            
+            // Apply status effects
+            if (result.statusApplied) {
+              result.statusApplied.forEach(status => {
+                entity.statusEffects.set(status.id, {
+                  id: status.id,
+                  stacks: status.stacks,
+                  duration: status.duration,
+                });
+              });
+            }
+          }
+        });
       }
     });
   }
 
-  private generateEndFrames(entities: CombatEntity[], roundNumber: number): CombatFrameDto[] {
-    const endFrames: CombatFrameDto[] = [];
+  private generateLeanEndFrames(entities: CombatEntity[], roundNumber: number): LeanEndFrameDto[] {
+    const endFrames: LeanEndFrameDto[] = [];
+    const statusTicks: StatusTickDto[] = [];
+    const deathFrames: DeathFrameDto[] = [];
     
     // Process status effects
     entities.forEach(entity => {
       if (entity.isAlive && entity.statusEffects.size > 0) {
         entity.statusEffects.forEach((status, statusId) => {
-          // Status tick frame
-          endFrames.push({
-            type: 'status_tick',
-            source: statusId,
-            targets: [entity.id],
-            amount: 0,
-            note: status.duration === status.duration ? 'Newly applied this round → no tick yet.' : 'Status tick',
-          });
+          // Calculate status damage based on type
+          let statusDamage = 0;
+          
+          if (statusId === 'bleed') {
+            // Bleed deals 10% of max HP per tick
+            statusDamage = Math.max(1, Math.floor(entity.maxHp * 0.1));
+          }
+          
+          // Apply status damage if any
+          if (statusDamage > 0) {
+            const hpBefore = entity.currentHp;
+            const hpAfter = Math.max(0, hpBefore - statusDamage);
+            const isKill = hpAfter <= 0;
+            const stacksBefore = status.stacks;
+            const durationAfter = status.duration - 1;
+            const expired = durationAfter <= 0;
+            
+            // Update entity HP
+            entity.currentHp = hpAfter;
+            if (hpAfter <= 0) {
+              entity.isAlive = false;
+            }
+            
+            // Create status tick
+            statusTicks.push({
+              status: statusId,
+              targetId: entity.id,
+              amount: statusDamage,
+              hpBefore,
+              hpAfter,
+              stacksBefore,
+              durationAfter,
+              expired,
+              lethal: isKill,
+            });
+            
+            // Add death frame if killed by status
+            if (isKill) {
+              deathFrames.push({
+                type: 'death',
+                targets: [entity.id],
+                cause: statusId,
+              });
+            }
+          }
           
           // Update status duration
           status.duration -= 1;
-          
-          // Status update frame
-          endFrames.push({
-            type: 'status_update',
-            targetId: entity.id,
-            status: { ...status },
-          });
           
           // Remove expired status
           if (status.duration <= 0) {
@@ -384,39 +405,31 @@ export class CombatService {
       
       // Cleanup statuses for dead entities
       if (!entity.isAlive && entity.statusEffects.size > 0) {
-        endFrames.push({
-          type: 'status_cleanup',
-          targets: [entity.id],
-          note: 'Target dead → remove statuses silently',
-        });
         entity.statusEffects.clear();
       }
     });
     
-    // End round frame
+    // Add round end frame with status ticks
     endFrames.push({
-      type: 'end_round',
+      type: 'round_end',
       roundNumber,
+      statusTicks: statusTicks.length > 0 ? statusTicks : undefined,
     });
+    
+    // Add death frames
+    endFrames.push(...deathFrames);
     
     return endFrames;
   }
 
-  private createFrameCombatResult(
+  private createLeanCombatResult(
     outcome: 'victory' | 'defeat',
     totalRounds: number,
-    rounds: CombatRoundDto[],
+    rounds: LeanRoundDto[],
     logId: string,
-    initialActorData: Array<{
-      id: string;
-      name: string;
-      code?: string;
-      isPlayer: boolean;
-      maxHp: number;
-      initialHp: number;
-    }>,
+    initialActorData: LeanActorDto[],
     rewards?: { gold: number; xp: number; items?: any[] }
-  ): FrameCombatResultDto {
+  ): LeanCombatResultDto {
     // Add end battle frame to last round
     if (rounds.length > 0) {
       const lastRound = rounds[rounds.length - 1];
@@ -428,19 +441,12 @@ export class CombatService {
     }
     
     return {
-      version: 'v2-frames',
+      version: 'v2-lean',
       logId,
       tickPolicy: 'end_of_round',
       outcome,
       totalRounds,
-      actors: initialActorData.map(actor => ({
-        id: actor.id,
-        name: actor.name,
-        code: actor.code,
-        isPlayer: actor.isPlayer,
-        maxHp: actor.maxHp,
-        hp: actor.initialHp,
-      })),
+      actors: initialActorData,
       rounds,
       rewards,
     };

@@ -101,6 +101,16 @@ export class StatusTickFrameDto {
   amount: number;
 
   @IsOptional()
+  hpBefore?: Record<string, number>;
+
+  @IsOptional()
+  hpAfter?: Record<string, number>;
+
+  @IsOptional()
+  @IsBoolean()
+  kill?: boolean;
+
+  @IsOptional()
   @IsString()
   note?: string;
 }
