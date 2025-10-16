@@ -205,6 +205,7 @@ async function main() {
       rarity: ItemRarity.common,
       slot: ItemSlot.weapon,
       baseStats: {
+        attackType: "slashes",
         damage: 5,
         critChance: 0.01,
         element: 'physical',

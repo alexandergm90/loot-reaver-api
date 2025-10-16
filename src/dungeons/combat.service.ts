@@ -108,7 +108,7 @@ export class CombatService {
     const logId = `run_${Date.now()}`;
 
     while (roundNumber <= maxRounds) {
-      const round = this.simulateLeanRound(entities, roundNumber, logId);
+      const round = this.simulateLeanRound(entities, roundNumber, logId, playerStats.attackType);
       rounds.push(round);
 
       // Check if combat is over
@@ -136,10 +136,11 @@ export class CombatService {
     return result;
   }
 
-  private calculatePlayerStats(equippedItems: any[]): { hp: number; damage: number } {
+  private calculatePlayerStats(equippedItems: any[]): { hp: number; damage: number; attackType: string } {
     // Base player stats
     let hp = 20;
     let damage = 5;
+    let attackType = 'slashes';
 
     // Add equipment bonuses
     for (const item of equippedItems) {
@@ -150,9 +151,10 @@ export class CombatService {
       if (typeof baseStats.damage === 'number') damage += baseStats.damage;
       if (typeof bonuses.hp === 'number') hp += bonuses.hp;
       if (typeof bonuses.damage === 'number') damage += bonuses.damage;
+      if (typeof baseStats.attackType === 'string') attackType = baseStats.attackType;
     }
 
-    return { hp, damage };
+    return { hp, damage, attackType };
   }
 
   private async getEnemyDataForLevel(dungeon: any, level: number) {
@@ -200,7 +202,7 @@ export class CombatService {
     });
   }
 
-  private simulateLeanRound(entities: CombatEntity[], roundNumber: number, logId: string): LeanRoundDto {
+  private simulateLeanRound(entities: CombatEntity[], roundNumber: number, logId: string, playerAttackType: string): LeanRoundDto {
     const actions: LeanActionDto[] = [];
     const aliveEntities = entities.filter(e => e.isAlive);
 
@@ -209,7 +211,7 @@ export class CombatService {
     const enemies = aliveEntities.filter(e => !e.isPlayer);
 
     if (player && enemies.length > 0) {
-      const playerAction = this.createLeanPlayerAction(player, enemies[0], roundNumber, logId);
+      const playerAction = this.createLeanPlayerAction(player, enemies[0], roundNumber, logId, playerAttackType);
       actions.push(playerAction);
       
       // Apply the action effects
@@ -236,7 +238,7 @@ export class CombatService {
     };
   }
 
-  private createLeanPlayerAction(attacker: CombatEntity, target: CombatEntity, roundNumber: number, logId: string): LeanActionDto {
+  private createLeanPlayerAction(attacker: CombatEntity, target: CombatEntity, roundNumber: number, logId: string, playerAttackType: string): LeanActionDto {
     const actionId = `player_attack_${roundNumber}_${logId}`;
     
     // Calculate damage and effects
@@ -268,7 +270,7 @@ export class CombatService {
     return {
       actionId,
       actorId: attacker.id,
-      ability: 'basic_slash',
+      ability: playerAttackType || 'slashes',
       element: 'physical',
       targets: [target.id],
       tags: ['melee', 'physical', 'player'],
@@ -301,7 +303,7 @@ export class CombatService {
     return {
       actionId,
       actorId: attacker.id,
-      ability: 'basic_claw',
+      ability: 'slashes',
       element: 'physical',
       targets: [target.id],
       tags: ['melee', 'physical', 'enemy'],
