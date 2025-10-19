@@ -327,11 +327,21 @@ export class CombatService {
             // Apply status effects
             if (result.statusApplied) {
               result.statusApplied.forEach(status => {
-                entity.statusEffects.set(status.id, {
-                  id: status.id,
-                  stacks: status.stacks,
-                  duration: status.duration,
-                });
+                const existing = entity.statusEffects.get(status.id);
+                if (existing) {
+                  // Stack and refresh duration
+                  entity.statusEffects.set(status.id, {
+                    id: status.id,
+                    stacks: existing.stacks + status.stacks,
+                    duration: Math.max(existing.duration, status.duration),
+                  });
+                } else {
+                  entity.statusEffects.set(status.id, {
+                    id: status.id,
+                    stacks: status.stacks,
+                    duration: status.duration,
+                  });
+                }
               });
             }
           }
@@ -353,8 +363,9 @@ export class CombatService {
           let statusDamage = 0;
           
           if (statusId === 'bleed') {
-            // Bleed deals 10% of max HP per tick
-            statusDamage = Math.max(1, Math.floor(entity.maxHp * 0.1));
+            // Bleed deals 10% of max HP per tick, multiplied by stacks
+            const baseDamage = Math.max(1, Math.floor(entity.maxHp * 0.1));
+            statusDamage = baseDamage * status.stacks;
           }
           
           // Apply status damage if any
