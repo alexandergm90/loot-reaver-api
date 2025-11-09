@@ -140,7 +140,12 @@ export class CombatService {
     // Base player stats
     let hp = 20;
     let damage = 5;
-    let attackType = 'slashes';
+    
+    // Check if a weapon is equipped
+    const weapon = equippedItems.find(item => item.slot === 'weapon');
+    
+    // Default to 'smashes' (fists) if no weapon equipped
+    let attackType = 'smashes';
 
     // Add equipment bonuses
     for (const item of equippedItems) {
@@ -151,7 +156,16 @@ export class CombatService {
       if (typeof baseStats.damage === 'number') damage += baseStats.damage;
       if (typeof bonuses.hp === 'number') hp += bonuses.hp;
       if (typeof bonuses.damage === 'number') damage += bonuses.damage;
-      if (typeof baseStats.attackType === 'string') attackType = baseStats.attackType;
+      
+      // If this is a weapon, use its attackType (overrides default 'smashes')
+      if (item.slot === 'weapon') {
+        if (typeof baseStats.attackType === 'string') {
+          attackType = baseStats.attackType;
+        } else {
+          // Weapon without attackType defaults to 'slashes'
+          attackType = 'slashes';
+        }
+      }
     }
 
     return { hp, damage, attackType };
@@ -270,7 +284,7 @@ export class CombatService {
     return {
       actionId,
       actorId: attacker.id,
-      ability: playerAttackType || 'slashes',
+      ability: playerAttackType || 'smashes', // Default to fists if no attack type specified
       element: 'physical',
       targets: [target.id],
       tags: ['melee', 'physical', 'player'],
