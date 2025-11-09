@@ -23,6 +23,7 @@ enum ItemSlot {
   cape
   ring
   neck
+  legs
 }
 
 enum ItemRarity {
@@ -78,12 +79,12 @@ model Character {
   trait     CharacterTrait
   createdAt DateTime       @default(now())
 
-  appearance   CharacterAppearance?
-  resources    CharacterResources?
-  stats        CharacterStats?
-  items        CharacterItem[]
-  achievements CharacterAchievement[]
-  dungeonRuns  DungeonRun[]
+  appearance      CharacterAppearance?
+  resources       CharacterResources?
+  stats           CharacterStats?
+  items           CharacterItem[]
+  achievements    CharacterAchievement[]
+  dungeonRuns     DungeonRun[]
   dungeonProgress PlayerDungeonProgress[]
 
   @@index([userId])
@@ -148,15 +149,15 @@ model CharacterResources {
   pvpTokens    Int @default(0)
   mirrorShards Int @default(0)
 
-  runes Int @default(0)
+  runes                Int @default(0)
   // Base capacity for runes (default 4) and any bonuses (premium, skills, etc.)
-  runeCapacityBase  Int      @default(4)
-  runeCapacityBonus Int      @default(0)
+  runeCapacityBase     Int @default(4)
+  runeCapacityBonus    Int @default(0)
   // Base regen interval in seconds (default 1800 = 30 min), multiplicative modifier in milli-units (1000 = 1.0x),
   // and additive modifier in seconds (can be negative)
-  runeRegenBaseSeconds Int   @default(1800)
-  runeRegenMultiplier  Int   @default(1000)
-  runeRegenAddSeconds  Int   @default(0)
+  runeRegenBaseSeconds Int @default(1800)
+  runeRegenMultiplier  Int @default(1000)
+  runeRegenAddSeconds  Int @default(0)
 
   runesUpdatedAt      DateTime @default(now())
   soulstonesUpdatedAt DateTime @default(now())
@@ -206,8 +207,8 @@ model Enemy {
   id   String @id @default(uuid())
   name String
   code String @unique // e.g., "goblin_warrior"
-  hp   Int    // base health points
-  atk  Int    // base attack damage
+  hp   Int // base health points
+  atk  Int // base attack damage
 }
 
 model Dungeon {
@@ -215,19 +216,19 @@ model Dungeon {
   name       String
   code       String @unique // e.g., "goblin_cave", "spider_den"
   wavesCount Int
-  waveComp   Json   // [{"enemies":[{"id":"abc123","count":1}]},{"enemies":[{"id":"123bac","count":2},{"id":"1231231","count":1}]}]
+  waveComp   Json // [{"enemies":[{"id":"abc123","count":1}]},{"enemies":[{"id":"123bac","count":2},{"id":"1231231","count":1}]}]
 
   // Relations
-  scaling   DungeonScaling?
-  rewards   DungeonReward?
-  runs      DungeonRun[]
-  progress  PlayerDungeonProgress[]
+  scaling  DungeonScaling?
+  rewards  DungeonReward?
+  runs     DungeonRun[]
+  progress PlayerDungeonProgress[]
 }
 
 model DungeonScaling {
-  id         String  @id @default(uuid())
-  dungeon    Dungeon @relation(fields: [dungeonId], references: [id])
-  dungeonId  String  @unique
+  id        String  @id @default(uuid())
+  dungeon   Dungeon @relation(fields: [dungeonId], references: [id])
+  dungeonId String  @unique
 
   hpGrowth   Float // e.g., 0.10 = +10% per level
   atkGrowth  Float // e.g., 0.08 = +8% per level
@@ -236,9 +237,9 @@ model DungeonScaling {
 }
 
 model DungeonReward {
-  id         String  @id @default(uuid())
-  dungeon    Dungeon @relation(fields: [dungeonId], references: [id])
-  dungeonId  String  @unique
+  id        String  @id @default(uuid())
+  dungeon   Dungeon @relation(fields: [dungeonId], references: [id])
+  dungeonId String  @unique
 
   baseGoldMin Int
   baseGoldMax Int
@@ -248,16 +249,16 @@ model DungeonReward {
 }
 
 model DungeonRun {
-  id         String   @id @default(uuid())
-  character  Character @relation(fields: [characterId], references: [id])
+  id          String    @id @default(uuid())
+  character   Character @relation(fields: [characterId], references: [id])
   characterId String
-  dungeon    Dungeon  @relation(fields: [dungeonId], references: [id])
-  dungeonId  String
-  level      Int
+  dungeon     Dungeon   @relation(fields: [dungeonId], references: [id])
+  dungeonId   String
+  level       Int
 
-  outcome      String // "victory" | "defeat"
-  turns        Int
-  rewardsJson  Json   // what was awarded
+  outcome        String // "victory" | "defeat"
+  turns          Int
+  rewardsJson    Json // what was awarded
   logCompactJson Json? // small array of events for playback/review
 
   createdAt DateTime @default(now())
@@ -267,11 +268,11 @@ model DungeonRun {
 }
 
 model PlayerDungeonProgress {
-  id         String    @id @default(uuid())
-  character  Character @relation(fields: [characterId], references: [id])
+  id          String    @id @default(uuid())
+  character   Character @relation(fields: [characterId], references: [id])
   characterId String
-  dungeon    Dungeon   @relation(fields: [dungeonId], references: [id])
-  dungeonId  String
+  dungeon     Dungeon   @relation(fields: [dungeonId], references: [id])
+  dungeonId   String
 
   highestLevelCleared Int @default(0)
 
