@@ -201,7 +201,7 @@ async function main() {
   const starterItems = [
     {
       code: 'basic_sword',
-      name: 'Worn Blade',
+      name: 'Basic Sword',
       rarity: ItemRarity.common,
       slot: ItemSlot.weapon,
       baseStats: {
@@ -212,8 +212,8 @@ async function main() {
       },
     },
     {
-      code: 'basic_chest',
-      name: 'Torn Tunic',
+      code: 'leather_tunic',
+      name: 'Leather Tunic',
       rarity: ItemRarity.common,
       slot: ItemSlot.chest,
       baseStats: {
@@ -221,8 +221,26 @@ async function main() {
       },
     },
     {
-      code: 'basic_glove',
-      name: 'Frayed Gloves',
+      code: 'basic_cape',
+      name: 'Basic Cape',
+      rarity: ItemRarity.common,
+      slot: ItemSlot.cape,
+      baseStats: {
+        armor: 1,
+      },
+    },
+    {
+      code: 'leather_boot',
+      name: 'Leather Boots',
+      rarity: ItemRarity.common,
+      slot: ItemSlot.feet,
+      baseStats: {
+        armor: 2,
+      },
+    },
+    {
+      code: 'leather_glove',
+      name: 'Leather Gloves',
       rarity: ItemRarity.common,
       slot: ItemSlot.glove,
       baseStats: {
@@ -231,10 +249,19 @@ async function main() {
       },
     },
     {
-      code: 'basic_feet',
-      name: 'Worn Boots',
+      code: 'leather_helmet',
+      name: 'Leather Helmet',
       rarity: ItemRarity.common,
-      slot: ItemSlot.feet,
+      slot: ItemSlot.helmet,
+      baseStats: {
+        armor: 2,
+      },
+    },
+    {
+      code: 'leather_pants',
+      name: 'Leather Pants',
+      rarity: ItemRarity.common,
+      slot: ItemSlot.legs,
       baseStats: {
         armor: 2,
       },

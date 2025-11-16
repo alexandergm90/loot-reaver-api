@@ -63,40 +63,12 @@ export class RegisterService {
         stats: {
           create: {}, // all fields default to 0
         },
-
-        items: {
-          create: [
-            {
-              template: { connect: { code: 'basic_sword' } },
-              slot: 'weapon',
-              equipped: true,
-            },
-            {
-              template: { connect: { code: 'basic_chest' } },
-              slot: 'chest',
-              equipped: true,
-            },
-            {
-              template: { connect: { code: 'basic_glove' } },
-              slot: 'glove',
-              equipped: true,
-            },
-            {
-              template: { connect: { code: 'basic_feet' } },
-              slot: 'feet',
-              equipped: true,
-            },
-          ],
-        },
       },
 
       include: {
         appearance: true,
         resources: true,
         stats: true,
-        items: {
-          include: { template: true },
-        },
       },
     });
 
@@ -107,12 +79,6 @@ export class RegisterService {
       trait: character.trait,
       appearance: character.appearance,
       resources: character.resources,
-      items: character.items.map((i) => ({
-        id: i.id,
-        slot: i.slot,
-        equipped: i.equipped,
-        template: i.template,
-      })),
     };
   }
 }
