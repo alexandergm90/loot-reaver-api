@@ -27,12 +27,12 @@ enum ItemSlot {
 }
 
 enum ItemRarity {
-  common
-  uncommon
-  rare
-  epic
-  legendary
-  mythical
+  worn
+  superior
+  enchanted
+  heroic
+  relic
+  celestial
 }
 
 enum CharacterTrait {
@@ -128,7 +128,7 @@ model CharacterItem {
   templateId String
 
   slot          ItemSlot
-  rarity        ItemRarity @default(uncommon)
+  rarity        ItemRarity @default(superior)
   equipped      Boolean  @default(false)
   durability    Int      @default(100)
   socketedRunes Json?
