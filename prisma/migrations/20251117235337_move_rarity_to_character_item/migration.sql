@@ -5,3 +5,4 @@ ALTER TABLE "CharacterItem" ADD COLUMN "rarity" "ItemRarity" NOT NULL DEFAULT 'u
 ALTER TABLE "ItemTemplate" DROP COLUMN "rarity";
 
 
+
