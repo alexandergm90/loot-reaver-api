@@ -1,4 +1,4 @@
-import { PrismaClient, ItemRarity, ItemSlot } from '@prisma/client';
+import { PrismaClient, ItemSlot } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -202,7 +202,6 @@ async function main() {
     {
       code: 'basic_sword',
       name: 'Basic Sword',
-      rarity: ItemRarity.common,
       slot: ItemSlot.weapon,
       baseStats: {
         attackType: "slashes",
@@ -214,7 +213,6 @@ async function main() {
     {
       code: 'leather_tunic',
       name: 'Leather Tunic',
-      rarity: ItemRarity.common,
       slot: ItemSlot.chest,
       baseStats: {
         armor: 3,
@@ -223,7 +221,6 @@ async function main() {
     {
       code: 'basic_cape',
       name: 'Basic Cape',
-      rarity: ItemRarity.common,
       slot: ItemSlot.cape,
       baseStats: {
         armor: 1,
@@ -232,7 +229,6 @@ async function main() {
     {
       code: 'leather_boot',
       name: 'Leather Boots',
-      rarity: ItemRarity.common,
       slot: ItemSlot.feet,
       baseStats: {
         armor: 2,
@@ -241,7 +237,6 @@ async function main() {
     {
       code: 'leather_glove',
       name: 'Leather Gloves',
-      rarity: ItemRarity.common,
       slot: ItemSlot.glove,
       baseStats: {
         armor: 1,
@@ -251,7 +246,6 @@ async function main() {
     {
       code: 'leather_helmet',
       name: 'Leather Helmet',
-      rarity: ItemRarity.common,
       slot: ItemSlot.helmet,
       baseStats: {
         armor: 2,
@@ -260,7 +254,6 @@ async function main() {
     {
       code: 'leather_pants',
       name: 'Leather Pants',
-      rarity: ItemRarity.common,
       slot: ItemSlot.legs,
       baseStats: {
         armor: 2,
@@ -277,7 +270,6 @@ async function main() {
         data: {
           code: item.code,
           name: item.name,
-          rarity: item.rarity,
           slot: item.slot,
           baseStats: item.baseStats,
           iconUrl, // auto-generated

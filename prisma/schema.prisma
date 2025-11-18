@@ -111,7 +111,6 @@ model ItemTemplate {
   id        String     @id @default(uuid())
   code      String     @unique // e.g., "wooden_sword"
   name      String
-  rarity    ItemRarity
   slot      ItemSlot
   baseStats Json
   iconUrl   String
@@ -128,6 +127,7 @@ model CharacterItem {
   templateId String
 
   slot          ItemSlot
+  rarity        ItemRarity @default(uncommon)
   equipped      Boolean  @default(false)
   durability    Int      @default(100)
   socketedRunes Json?

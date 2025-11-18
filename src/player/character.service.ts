@@ -54,6 +54,7 @@ export class CharacterService {
     return items.map((i) => ({
       id: i.id,
       slot: i.slot,
+      rarity: i.rarity,
       durability: i.durability,
       template: i.template,
     }));
