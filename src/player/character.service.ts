@@ -60,6 +60,31 @@ export class CharacterService {
     }));
   }
 
+  async getItemDetails(userId: string, itemId: string) {
+    const item = await this.prisma.characterItem.findFirst({
+      where: { id: itemId },
+      include: {
+        template: true,
+        character: { select: { id: true, userId: true } },
+      },
+    });
+
+    if (!item) throw new NotFoundException('Item not found');
+    if (item.character.userId !== userId) throw new ForbiddenException('Cannot view item you do not own');
+
+    return {
+      id: item.id,
+      slot: item.slot,
+      rarity: item.rarity,
+      equipped: item.equipped,
+      durability: item.durability,
+      socketedRunes: item.socketedRunes,
+      bonuses: item.bonuses,
+      createdAt: item.createdAt,
+      template: item.template,
+    };
+  }
+
   async equipItem(userId: string, itemId: string, providedSubslot?: string) {
     return this.prisma.$transaction(async (tx) => {
       const item = await tx.characterItem.findFirst({

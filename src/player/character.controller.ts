@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '@/auth/jwt-auth.guard';
 import { CharacterService } from './character.service';
 import { AuthenticatedRequest } from '@/types/auth.types';
@@ -22,6 +22,13 @@ export class CharacterController {
   @Get('inventory')
   async getInventory(@Req() req: AuthenticatedRequest) {
     return this.character.getInventory(req.user.id);
+  }
+
+  // GET /items/:id: get item details by characterItem.id
+  @UseGuards(JwtAuthGuard)
+  @Get('items/:id')
+  async getItemDetails(@Req() req: AuthenticatedRequest, @Param('id') itemId: string) {
+    return this.character.getItemDetails(req.user.id, itemId);
   }
 
   // POST /equipment/equip: equip item and return updated equipped + derived stats
