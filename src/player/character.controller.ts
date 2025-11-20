@@ -38,6 +38,13 @@ export class CharacterController {
     return this.character.equipItem(req.user.id, body.itemId, body.slot);
   }
 
+  // POST /equipment/unequip: unequip item and return updated equipped + derived stats
+  @UseGuards(JwtAuthGuard)
+  @Post('equipment/unequip')
+  async unequip(@Req() req: AuthenticatedRequest, @Body() body: EquipItemDto) {
+    return this.character.unequipItem(req.user.id, body.itemId);
+  }
+
   // POST /items/use: placeholder for consumables
   @UseGuards(JwtAuthGuard)
   @Post('items/use')

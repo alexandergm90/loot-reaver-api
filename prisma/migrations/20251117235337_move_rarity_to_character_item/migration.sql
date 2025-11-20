@@ -6,3 +6,4 @@ ALTER TABLE "ItemTemplate" DROP COLUMN "rarity";
 
 
 
+
