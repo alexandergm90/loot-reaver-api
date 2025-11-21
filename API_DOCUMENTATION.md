@@ -456,3 +456,4 @@ Valid `ItemRarity` enum values:
 
 4. **Idempotent Equip**: If you try to equip an item that's already equipped in the correct slot, the request succeeds and returns the current state without making changes.
 
+

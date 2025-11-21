@@ -109,12 +109,13 @@ model CharacterAppearance {
 }
 
 model ItemTemplate {
-  id        String     @id @default(uuid())
-  code      String     @unique // e.g., "wooden_sword"
-  name      String
-  slot      ItemSlot
-  baseStats Json
-  iconUrl   String
+  id         String     @id @default(uuid())
+  code       String     @unique // e.g., "wooden_sword"
+  name       String
+  slot       ItemSlot
+  baseStats  Json
+  iconUrl    String
+  isTwoHanded Boolean   @default(false)
 
   CharacterItem CharacterItem[]
 }
@@ -130,6 +131,8 @@ model CharacterItem {
   slot          ItemSlot
   rarity        ItemRarity @default(superior)
   equipped      Boolean  @default(false)
+  equippedHand  String? // "left" | "right" | null (for weapons, rings, shields)
+  isTwoHanded   Boolean  @default(false)
   durability    Int      @default(100)
   socketedRunes Json?
   bonuses       Json? // dynamic modifiers

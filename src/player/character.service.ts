@@ -33,6 +33,7 @@ export class CharacterService {
         slot: i.slot,
         rarity: i.rarity,
         code: i.template.code,
+        equippedHand: i.equippedHand,
         template: i.template,
       })),
       derivedStats,
@@ -76,6 +77,8 @@ export class CharacterService {
       slot: item.slot,
       rarity: item.rarity,
       equipped: item.equipped,
+      equippedHand: item.equippedHand,
+      isTwoHanded: item.isTwoHanded || item.template.isTwoHanded,
       durability: item.durability,
       socketedRunes: item.socketedRunes,
       bonuses: item.bonuses,
@@ -93,46 +96,130 @@ export class CharacterService {
       if (!item) throw new NotFoundException('Item not found');
       if (item.character.userId !== userId) throw new ForbiddenException('Cannot equip item you do not own');
 
+      // Determine if item is two-handed (from template or characterItem)
+      const isTwoHanded = item.template.isTwoHanded || item.isTwoHanded;
+      const itemSlot = item.slot;
+
       // Validation: Check if item is already equipped
       if (item.equipped) {
-        // If slot is provided and matches, or no slot provided, it's already equipped correctly
-        if (!slot || slot === item.slot) {
-          // Already equipped in the correct slot, return current state
+        // Check if already equipped to the requested hand
+        const requestedHand = this.determineEquippedHand(itemSlot, slot);
+        if (item.equippedHand === requestedHand) {
+          // Already equipped correctly, return current state
           const equipped = await tx.characterItem.findMany({
             where: { characterId: item.character.id, equipped: true },
             include: { template: true },
           });
           const derivedStats = this.computeDerivedStats(equipped);
-          return {
-            equipped: equipped.map((e) => ({
-              id: e.id,
-              slot: e.slot,
-              rarity: e.rarity,
-              code: e.template.code,
-              template: e.template,
-            })),
-            derivedStats,
-          };
-        } else {
-          throw new BadRequestException('Item is already equipped in a different slot');
+          return this.formatEquippedResponse(equipped, derivedStats);
         }
       }
 
-      // Validation: Check if item is in inventory (not equipped)
-      // This is already checked above, but keeping for clarity
+      // Validation: Slot parameter for weapons, rings, and shields
+      const requestedHand = this.determineEquippedHand(itemSlot, slot);
+      if (itemSlot === 'weapon' || itemSlot === 'ring' || itemSlot === 'shield') {
+        if (slot && slot !== 'left' && slot !== 'right') {
+          throw new BadRequestException(`Slot parameter must be "left" or "right" for ${itemSlot}`);
+        }
+      }
 
-      // Determine the slot to use: provided slot (for left/right sub-slots) or item's slot from template
-      // Note: slot parameter is for sub-slots (left/right) when dual wielding weapons or equipping two rings
-      const targetSlot: ItemSlot = item.slot;
-
-      // Unequip any currently equipped items in the same slot
-      await tx.characterItem.updateMany({
-        where: { characterId: item.character.id, slot: targetSlot, equipped: true },
-        data: { equipped: false },
+      // Get currently equipped items to check conflicts
+      const currentlyEquipped = await tx.characterItem.findMany({
+        where: { characterId: item.character.id, equipped: true },
+        include: { template: true },
       });
 
+      // Handle two-handed weapon conflicts
+      if (isTwoHanded && itemSlot === 'weapon') {
+        // Unequip all weapons and shield
+        await tx.characterItem.updateMany({
+          where: {
+            characterId: item.character.id,
+            equipped: true,
+            OR: [
+              { slot: 'weapon' },
+              { slot: 'shield' },
+            ],
+          },
+          data: { equipped: false, equippedHand: null },
+        });
+      } else if (itemSlot === 'shield') {
+        // Shield can only be equipped to left hand
+        if (requestedHand !== 'left') {
+          throw new BadRequestException('Shield must be equipped to left hand');
+        }
+        // Unequip two-handed weapons
+        const twoHandedWeapons = currentlyEquipped.filter(
+          (e) => e.slot === 'weapon' && (e.template.isTwoHanded || e.isTwoHanded)
+        );
+        for (const weapon of twoHandedWeapons) {
+          await tx.characterItem.update({
+            where: { id: weapon.id },
+            data: { equipped: false, equippedHand: null },
+          });
+        }
+        // Unequip any shield already equipped
+        await tx.characterItem.updateMany({
+          where: {
+            characterId: item.character.id,
+            slot: 'shield',
+            equipped: true,
+          },
+          data: { equipped: false, equippedHand: null },
+        });
+      } else if (itemSlot === 'weapon' && !isTwoHanded) {
+        // One-handed weapon: unequip two-handed weapons first
+        const twoHandedWeapons = currentlyEquipped.filter(
+          (e) => e.slot === 'weapon' && (e.template.isTwoHanded || e.isTwoHanded)
+        );
+        for (const weapon of twoHandedWeapons) {
+          await tx.characterItem.update({
+            where: { id: weapon.id },
+            data: { equipped: false, equippedHand: null },
+          });
+        }
+        // Unequip weapon in the same hand only
+        await tx.characterItem.updateMany({
+          where: {
+            characterId: item.character.id,
+            slot: 'weapon',
+            equipped: true,
+            equippedHand: requestedHand,
+          },
+          data: { equipped: false, equippedHand: null },
+        });
+      } else if (itemSlot === 'ring') {
+        // Rings: only unequip ring in the same hand
+        await tx.characterItem.updateMany({
+          where: {
+            characterId: item.character.id,
+            slot: 'ring',
+            equipped: true,
+            equippedHand: requestedHand,
+          },
+          data: { equipped: false, equippedHand: null },
+        });
+      } else {
+        // Other slots: unequip all items in the same slot
+        await tx.characterItem.updateMany({
+          where: {
+            characterId: item.character.id,
+            slot: itemSlot,
+            equipped: true,
+          },
+          data: { equipped: false, equippedHand: null },
+        });
+      }
+
       // Equip the requested item
-      await tx.characterItem.update({ where: { id: item.id }, data: { equipped: true } });
+      await tx.characterItem.update({
+        where: { id: item.id },
+        data: {
+          equipped: true,
+          equippedHand: requestedHand,
+          isTwoHanded: isTwoHanded,
+        },
+      });
 
       // Return updated equipment + derived stats
       const equipped = await tx.characterItem.findMany({
@@ -142,17 +229,34 @@ export class CharacterService {
 
       const derivedStats = this.computeDerivedStats(equipped);
 
-      return {
-        equipped: equipped.map((e) => ({
-          id: e.id,
-          slot: e.slot,
-          rarity: e.rarity,
-          code: e.template.code,
-          template: e.template,
-        })),
-        derivedStats,
-      };
+      return this.formatEquippedResponse(equipped, derivedStats);
     });
+  }
+
+  private determineEquippedHand(itemSlot: ItemSlot, slot?: string): string | null {
+    // For weapons, rings, and shields, determine which hand
+    if (itemSlot === 'weapon' || itemSlot === 'ring' || itemSlot === 'shield') {
+      // Shield always goes to left hand
+      if (itemSlot === 'shield') return 'left';
+      // Use provided slot or default to 'left'
+      return slot === 'right' ? 'right' : 'left';
+    }
+    // Other slots don't use hand
+    return null;
+  }
+
+  private formatEquippedResponse(equipped: any[], derivedStats: Record<string, number>) {
+    return {
+      equipped: equipped.map((e) => ({
+        id: e.id,
+        slot: e.slot,
+        rarity: e.rarity,
+        code: e.template.code,
+        equippedHand: e.equippedHand,
+        template: e.template,
+      })),
+      derivedStats,
+    };
   }
 
   async unequipItem(userId: string, itemId: string) {
@@ -166,7 +270,10 @@ export class CharacterService {
       if (!item.equipped) throw new BadRequestException('Item is not equipped');
 
       // Unequip the item
-      await tx.characterItem.update({ where: { id: item.id }, data: { equipped: false } });
+      await tx.characterItem.update({
+        where: { id: item.id },
+        data: { equipped: false, equippedHand: null },
+      });
 
       // Return updated equipment + derived stats
       const equipped = await tx.characterItem.findMany({
@@ -176,16 +283,7 @@ export class CharacterService {
 
       const derivedStats = this.computeDerivedStats(equipped);
 
-      return {
-        equipped: equipped.map((e) => ({
-          id: e.id,
-          slot: e.slot,
-          rarity: e.rarity,
-          code: e.template.code,
-          template: e.template,
-        })),
-        derivedStats,
-      };
+      return this.formatEquippedResponse(equipped, derivedStats);
     });
   }
   
