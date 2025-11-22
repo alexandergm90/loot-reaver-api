@@ -110,7 +110,7 @@ model CharacterAppearance {
 
 model ItemTemplate {
   id         String     @id @default(uuid())
-  code       String     @unique // e.g., "wooden_sword"
+  code       String     // e.g., "wooden_sword" - can be shared across items with same image
   name       String
   slot       ItemSlot
   baseStats  Json

@@ -264,7 +264,8 @@ async function main() {
   for (const item of starterItems) {
     const iconUrl = `/images/items/${item.slot}/${item.code}.png`;
 
-    const exists = await prisma.itemTemplate.findUnique({ where: { code: item.code } });
+    // Check if item with same name already exists (since code is no longer unique)
+    const exists = await prisma.itemTemplate.findFirst({ where: { name: item.name } });
     if (!exists) {
       await prisma.itemTemplate.create({
         data: {

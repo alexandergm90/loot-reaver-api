@@ -158,6 +158,16 @@ export class CharacterService {
             data: { equipped: false, equippedHand: null },
           });
         }
+        // Unequip any one-handed weapon in the left hand (shields are always left hand)
+        await tx.characterItem.updateMany({
+          where: {
+            characterId: item.character.id,
+            slot: 'weapon',
+            equipped: true,
+            equippedHand: 'left',
+          },
+          data: { equipped: false, equippedHand: null },
+        });
         // Unequip any shield already equipped
         await tx.characterItem.updateMany({
           where: {
@@ -175,6 +185,17 @@ export class CharacterService {
         for (const weapon of twoHandedWeapons) {
           await tx.characterItem.update({
             where: { id: weapon.id },
+            data: { equipped: false, equippedHand: null },
+          });
+        }
+        // If equipping to left hand, unequip shield (shields are always left hand)
+        if (requestedHand === 'left') {
+          await tx.characterItem.updateMany({
+            where: {
+              characterId: item.character.id,
+              slot: 'shield',
+              equipped: true,
+            },
             data: { equipped: false, equippedHand: null },
           });
         }
