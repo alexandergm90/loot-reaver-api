@@ -311,14 +311,8 @@ export class CharacterService {
   private computeDerivedStats(equipped: Array<{ template: any; bonuses?: any }>): Record<string, number> {
     const totals: Record<string, number> = {};
     for (const item of equipped) {
-      // Use baseStats from template
-      const base = (item.template?.baseStats ?? {}) as Record<string, unknown>;
-      for (const [key, value] of Object.entries(base)) {
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          totals[key] = (totals[key] ?? 0) + value;
-        }
-      }
-      // Use CharacterItem.bonuses (final bonuses including upgrades)
+      // Only use CharacterItem.bonuses (final bonuses including upgrades)
+      // Exclude baseStats from ItemTemplate
       const bonuses = (item.bonuses ?? {}) as Record<string, unknown>;
       for (const [key, value] of Object.entries(bonuses)) {
         if (typeof value === 'number' && Number.isFinite(value)) {
