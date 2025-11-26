@@ -1,10 +1,14 @@
 import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
+import { StatsCalculationService } from '@/common/stats/stats-calculation.service';
 import { ItemSlot } from '@prisma/client';
 
 @Injectable()
 export class CharacterService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly statsCalculation: StatsCalculationService
+  ) {}
 
   async getCharacterWithEquipment(userId: string) {
     const character = await this.prisma.character.findFirst({
@@ -17,7 +21,12 @@ export class CharacterService {
     });
     if (!character) return null;
 
-    const derivedStats = this.computeDerivedStats(character.items);
+    // Determine attack type from weapon
+    const weapon = character.items.find((i) => i.slot === 'weapon');
+    const baseStats = weapon?.template?.baseStats as any;
+    const attackType = baseStats?.attackType || 'smashes';
+
+    const derivedStats = this.computeDerivedStats(character.items, character.level, attackType);
 
     return {
       id: character.id,
@@ -106,11 +115,18 @@ export class CharacterService {
         const requestedHand = this.determineEquippedHand(itemSlot, slot);
         if (item.equippedHand === requestedHand) {
           // Already equipped correctly, return current state
+          const character = await tx.character.findUnique({
+            where: { id: item.character.id },
+            select: { level: true },
+          });
           const equipped = await tx.characterItem.findMany({
             where: { characterId: item.character.id, equipped: true },
             include: { template: true },
           });
-          const derivedStats = this.computeDerivedStats(equipped);
+          const weapon = equipped.find((i) => i.slot === 'weapon');
+          const baseStats = weapon?.template?.baseStats as any;
+          const attackType = baseStats?.attackType || 'smashes';
+          const derivedStats = this.computeDerivedStats(equipped, character?.level || 1, attackType);
           return this.formatEquippedResponse(equipped, derivedStats);
         }
       }
@@ -242,13 +258,22 @@ export class CharacterService {
         },
       });
 
+      // Get character level and determine attack type
+      const character = await tx.character.findUnique({
+        where: { id: item.character.id },
+        select: { level: true },
+      });
+      
       // Return updated equipment + derived stats
       const equipped = await tx.characterItem.findMany({
         where: { characterId: item.character.id, equipped: true },
         include: { template: true },
       });
 
-      const derivedStats = this.computeDerivedStats(equipped);
+      const weapon = equipped.find((i) => i.slot === 'weapon');
+      const baseStats = weapon?.template?.baseStats as any;
+      const attackType = baseStats?.attackType || 'smashes';
+      const derivedStats = this.computeDerivedStats(equipped, character?.level || 1, attackType);
 
       return this.formatEquippedResponse(equipped, derivedStats);
     });
@@ -296,31 +321,72 @@ export class CharacterService {
         data: { equipped: false, equippedHand: null },
       });
 
+      // Get character level and determine attack type
+      const character = await tx.character.findUnique({
+        where: { id: item.character.id },
+        select: { level: true },
+      });
+      
       // Return updated equipment + derived stats
       const equipped = await tx.characterItem.findMany({
         where: { characterId: item.character.id, equipped: true },
         include: { template: true },
       });
 
-      const derivedStats = this.computeDerivedStats(equipped);
+      const weapon = equipped.find((i) => i.slot === 'weapon');
+      const baseStats = weapon?.template?.baseStats as any;
+      const attackType = baseStats?.attackType || 'smashes';
+      const derivedStats = this.computeDerivedStats(equipped, character?.level || 1, attackType);
 
       return this.formatEquippedResponse(equipped, derivedStats);
     });
   }
   
-  private computeDerivedStats(equipped: Array<{ template: any; bonuses?: any }>): Record<string, number> {
-    const totals: Record<string, number> = {};
-    for (const item of equipped) {
-      // Only use CharacterItem.bonuses (final bonuses including upgrades)
-      // Exclude baseStats from ItemTemplate
-      const bonuses = (item.bonuses ?? {}) as Record<string, unknown>;
-      for (const [key, value] of Object.entries(bonuses)) {
-        if (typeof value === 'number' && Number.isFinite(value)) {
-          totals[key] = (totals[key] ?? 0) + value;
-        }
-      }
-    }
-    return totals;
+  private computeDerivedStats(
+    equipped: Array<{ template?: any; bonuses?: any; slot?: string; equipped?: boolean; equippedHand?: string | null; isTwoHanded?: boolean }>,
+    characterLevel: number,
+    attackType: string = 'smashes'
+  ): Record<string, any> {
+    // Aggregate raw stats from equipment
+    const rawStats = this.statsCalculation.aggregateRawStats(equipped, characterLevel);
+    
+    // Calculate derived stats
+    const derivedStats = this.statsCalculation.calculateDerivedStats(rawStats, characterLevel, attackType);
+    
+    // Convert to a flat record for backward compatibility, but include all calculated values
+    return {
+      // Primary stats
+      health: derivedStats.health,
+      armor: derivedStats.armor,
+      strength: derivedStats.strength,
+      dexterity: derivedStats.dexterity,
+      intelligence: derivedStats.intelligence,
+      
+      // Attack stats
+      physicalDamageMin: derivedStats.physicalDamageMin,
+      physicalDamageMax: derivedStats.physicalDamageMax,
+      elementalDamage: derivedStats.elementalDamage,
+      totalDamageMin: derivedStats.totalDamageMin,
+      totalDamageMax: derivedStats.totalDamageMax,
+      
+      // Defense stats
+      critChance: derivedStats.critChance,
+      critMultiplier: derivedStats.critMultiplier,
+      dodgeChance: derivedStats.dodgeChance,
+      physicalReduction: derivedStats.physicalReduction,
+      
+      // Spell stats
+      ...(derivedStats.spellDamage !== undefined && { spellDamage: derivedStats.spellDamage }),
+      ...(derivedStats.spellProcChance !== undefined && { spellProcChance: derivedStats.spellProcChance }),
+      
+      // Status proc chances
+      ...(derivedStats.burnChance !== undefined && { burnChance: derivedStats.burnChance }),
+      ...(derivedStats.poisonChance !== undefined && { poisonChance: derivedStats.poisonChance }),
+      ...(derivedStats.stunChance !== undefined && { stunChance: derivedStats.stunChance }),
+      
+      // Attack type
+      attackType: derivedStats.attackType,
+    };
   }
 }
 

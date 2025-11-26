@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/prisma/prisma.service';
+import { StatsCalculationService } from '@/common/stats/stats-calculation.service';
+import { DerivedCharacterStats } from '@/common/stats/stats.types';
 import { 
   LeanCombatResultDto, 
   LeanRoundDto, 
@@ -18,7 +20,10 @@ import { CombatEntity, StatusEffect } from './types/combat.types';
 
 @Injectable()
 export class CombatService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly statsCalculation: StatsCalculationService
+  ) {}
 
   async runCombat(
     dungeonId: string,
@@ -59,23 +64,30 @@ export class CombatService {
       throw new NotFoundException('Character not found');
     }
 
-    // Calculate player stats (base stats + equipment)
-    const playerStats = this.calculatePlayerStats(character.items);
+    // Calculate player stats using stats calculation service
+    const weapon = character.items.find((i) => i.slot === 'weapon');
+    const baseStats = weapon?.template?.baseStats as any;
+    const attackType = baseStats?.attackType || 'smashes';
+    
+    const rawStats = this.statsCalculation.aggregateRawStats(character.items, character.level);
+    const playerDerivedStats = this.statsCalculation.calculateDerivedStats(rawStats, character.level, attackType);
     
     // Get enemy data for the specific level
     const enemyData = await this.getEnemyDataForLevel(dungeon, level);
     
     // Initialize combat entities
-    const entities: CombatEntity[] = [
+    const entities: (CombatEntity & { derivedStats?: DerivedCharacterStats; level?: number })[] = [
       {
         id: character.id,
         name: character.name,
-        currentHp: playerStats.hp,
-        maxHp: playerStats.hp,
-        damage: playerStats.damage,
+        currentHp: playerDerivedStats.health,
+        maxHp: playerDerivedStats.health,
+        damage: playerDerivedStats.totalDamageMax, // For backward compatibility
         isPlayer: true,
         isAlive: true,
         statusEffects: new Map(),
+        derivedStats: playerDerivedStats,
+        level: character.level,
       },
       ...enemyData.map((enemy, index) => ({
         id: `enemy_${enemy.id}_${index}`,
@@ -108,7 +120,7 @@ export class CombatService {
     const logId = `run_${Date.now()}`;
 
     while (roundNumber <= maxRounds) {
-      const round = this.simulateLeanRound(entities, roundNumber, logId, playerStats.attackType);
+      const round = this.simulateLeanRound(entities, roundNumber, logId, playerDerivedStats.attackType, character.level);
       rounds.push(round);
 
       // Check if combat is over
@@ -136,40 +148,6 @@ export class CombatService {
     return result;
   }
 
-  private calculatePlayerStats(equippedItems: any[]): { hp: number; damage: number; attackType: string } {
-    // Base player stats
-    let hp = 20;
-    let damage = 5;
-    
-    // Check if a weapon is equipped
-    const weapon = equippedItems.find(item => item.slot === 'weapon');
-    
-    // Default to 'smashes' (fists) if no weapon equipped
-    let attackType = 'smashes';
-
-    // Add equipment bonuses
-    for (const item of equippedItems) {
-      const baseStats = item.template?.baseStats || {};
-      const bonuses = item.bonuses || {};
-      
-      if (typeof baseStats.hp === 'number') hp += baseStats.hp;
-      if (typeof baseStats.damage === 'number') damage += baseStats.damage;
-      if (typeof bonuses.hp === 'number') hp += bonuses.hp;
-      if (typeof bonuses.damage === 'number') damage += bonuses.damage;
-      
-      // If this is a weapon, use its attackType (overrides default 'smashes')
-      if (item.slot === 'weapon') {
-        if (typeof baseStats.attackType === 'string') {
-          attackType = baseStats.attackType;
-        } else {
-          // Weapon without attackType defaults to 'slashes'
-          attackType = 'slashes';
-        }
-      }
-    }
-
-    return { hp, damage, attackType };
-  }
 
   private async getEnemyDataForLevel(dungeon: any, level: number) {
     const waveComp = dungeon.waveComp as any[];
@@ -216,7 +194,13 @@ export class CombatService {
     });
   }
 
-  private simulateLeanRound(entities: CombatEntity[], roundNumber: number, logId: string, playerAttackType: string): LeanRoundDto {
+  private simulateLeanRound(
+    entities: (CombatEntity & { derivedStats?: DerivedCharacterStats; level?: number })[],
+    roundNumber: number,
+    logId: string,
+    playerAttackType: string,
+    playerLevel: number
+  ): LeanRoundDto {
     const actions: LeanActionDto[] = [];
     const aliveEntities = entities.filter(e => e.isAlive);
 
@@ -225,7 +209,7 @@ export class CombatService {
     const enemies = aliveEntities.filter(e => !e.isPlayer);
 
     if (player && enemies.length > 0) {
-      const playerAction = this.createLeanPlayerAction(player, enemies[0], roundNumber, logId, playerAttackType);
+      const playerAction = this.createLeanPlayerAction(player, enemies[0], roundNumber, logId, playerAttackType, playerLevel);
       actions.push(playerAction);
       
       // Apply the action effects
@@ -252,19 +236,72 @@ export class CombatService {
     };
   }
 
-  private createLeanPlayerAction(attacker: CombatEntity, target: CombatEntity, roundNumber: number, logId: string, playerAttackType: string): LeanActionDto {
+  private createLeanPlayerAction(
+    attacker: CombatEntity & { derivedStats?: DerivedCharacterStats; level?: number },
+    target: CombatEntity & { derivedStats?: DerivedCharacterStats; level?: number },
+    roundNumber: number,
+    logId: string,
+    playerAttackType: string,
+    attackerLevel: number
+  ): LeanActionDto {
     const actionId = `player_attack_${roundNumber}_${logId}`;
     
-    // Calculate damage and effects
+    // Use stats calculation service to resolve attack
+    if (!attacker.derivedStats) {
+      throw new Error('Player entity missing derived stats');
+    }
+    
+    // Create basic defender stats for armor calculation
+    // Enemies don't have full derived stats yet, so we'll create a minimal one
+    const defenderStats: DerivedCharacterStats = target.derivedStats || {
+      health: target.maxHp,
+      armor: 0, // Enemies don't have armor in the current system
+      strength: 0,
+      dexterity: 0,
+      intelligence: 0,
+      physicalDamageMin: 0,
+      physicalDamageMax: 0,
+      elementalDamage: 0,
+      totalDamageMin: 0,
+      totalDamageMax: 0,
+      critChance: 0,
+      critMultiplier: 1.5,
+      dodgeChance: 0,
+      physicalReduction: 0,
+      attackType: 'smashes',
+    };
+    
+    // Resolve attack with all mechanics
+    const attackResult = this.statsCalculation.resolveAttack(
+      attacker.derivedStats,
+      defenderStats,
+      attackerLevel
+    );
+    
+    // Apply damage
     const hpBefore = target.currentHp;
-    const damage = this.calculateDamage(attacker.damage, target);
-    const hpAfter = Math.max(0, hpBefore - damage);
+    const hpAfter = Math.max(0, hpBefore - attackResult.totalDamage);
     const isKill = hpAfter <= 0;
     
-    // Check for status application
+    // Convert status effects to DTO format
     const statusApplied: StatusEffectDto[] = [];
-    if (Math.random() < 0.3) { // 30% chance to apply bleed
-      statusApplied.push({ id: 'bleed', stacks: 1, duration: 2 });
+    if (attackResult.statuses.burn) {
+      statusApplied.push({ id: 'burn', stacks: 1, duration: 3 });
+    }
+    if (attackResult.statuses.poison) {
+      statusApplied.push({ id: 'poison', stacks: 1, duration: 3 });
+    }
+    if (attackResult.statuses.stun) {
+      statusApplied.push({ id: 'stun', stacks: 1, duration: 1 });
+    }
+    
+    // Determine element based on damage types
+    let element = 'physical';
+    if (attackResult.elementalDamage > 0) {
+      element = 'elemental';
+    }
+    if (attackResult.spellProc) {
+      element = 'spell';
     }
     
     // Create single action frame with consolidated results
@@ -272,8 +309,8 @@ export class CombatService {
       type: 'action',
       results: [{
         targetId: target.id,
-        amount: damage,
-        crit: false,
+        amount: attackResult.totalDamage,
+        crit: attackResult.crit,
         hpBefore,
         hpAfter,
         kill: isKill,
@@ -284,10 +321,10 @@ export class CombatService {
     return {
       actionId,
       actorId: attacker.id,
-      ability: playerAttackType || 'smashes', // Default to fists if no attack type specified
-      element: 'physical',
+      ability: playerAttackType || 'smashes',
+      element,
       targets: [target.id],
-      tags: ['melee', 'physical', 'player'],
+      tags: ['melee', element, 'player'],
       frames: [actionFrame],
     };
   }
