@@ -67,7 +67,8 @@ export class CombatService {
     // Calculate player stats using stats calculation service
     const weapon = character.items.find((i) => i.slot === 'weapon');
     const baseStats = weapon?.template?.baseStats as any;
-    const attackType = baseStats?.attackType || 'smashes';
+    const bonuses = weapon?.bonuses as any;
+    const attackType = baseStats?.attackType || bonuses?.primary?.attackType || 'smashes';
     
     const rawStats = this.statsCalculation.aggregateRawStats(character.items, character.level);
     const playerDerivedStats = this.statsCalculation.calculateDerivedStats(rawStats, character.level, attackType);
@@ -262,11 +263,16 @@ export class CombatService {
       physicalDamageMin: 0,
       physicalDamageMax: 0,
       elementalDamage: 0,
+      fireDamage: 0,
+      lightningDamage: 0,
+      poisonDamage: 0,
       totalDamageMin: 0,
       totalDamageMax: 0,
       critChance: 0,
       critMultiplier: 1.5,
+      spellCritChance: 0,
       dodgeChance: 0,
+      blockChance: 0,
       physicalReduction: 0,
       attackType: 'smashes',
     };
@@ -284,6 +290,7 @@ export class CombatService {
     const isKill = hpAfter <= 0;
     
     // Convert status effects to DTO format
+    // Store source damage values for DoT calculation
     const statusApplied: StatusEffectDto[] = [];
     if (attackResult.statuses.burn) {
       statusApplied.push({ id: 'burn', stacks: 1, duration: 3 });
@@ -362,7 +369,13 @@ export class CombatService {
     };
   }
 
-  private applyLeanActionEffects(action: LeanActionDto, entities: CombatEntity[]): void {
+  private applyLeanActionEffects(
+    action: LeanActionDto,
+    entities: (CombatEntity & { derivedStats?: DerivedCharacterStats; level?: number })[]
+  ): void {
+    // Find the attacker to get their stats for DoT calculation
+    const attacker = entities.find(e => e.id === action.actorId);
+    
     // Apply effects from the action frame
     action.frames.forEach(frame => {
       if (frame.type === 'action') {
@@ -379,19 +392,42 @@ export class CombatService {
             if (result.statusApplied) {
               result.statusApplied.forEach(status => {
                 const existing = entity.statusEffects.get(status.id);
+                
+                // Prepare status effect with source damage values for DoT calculation
+                const statusEffect: StatusEffect = {
+                  id: status.id,
+                  stacks: status.stacks,
+                  duration: status.duration,
+                };
+                
+                // Store source damage values for burn/poison DoT calculation
+                if (attacker?.derivedStats) {
+                  if (status.id === 'burn') {
+                    statusEffect.sourceFireDamage = attacker.derivedStats.fireDamage;
+                    statusEffect.sourceIntelligence = attacker.derivedStats.intelligence;
+                    statusEffect.burnDamageBonus = attacker.derivedStats.burnDamageBonus || 0;
+                  }
+                  if (status.id === 'poison') {
+                    statusEffect.sourcePoisonDamage = attacker.derivedStats.poisonDamage;
+                    statusEffect.sourceIntelligence = attacker.derivedStats.intelligence;
+                    statusEffect.poisonDamageBonus = attacker.derivedStats.poisonDamageBonus || 0;
+                  }
+                }
+                
                 if (existing) {
-                  // Stack and refresh duration
+                  // Stack and refresh duration, but keep source damage from first application
                   entity.statusEffects.set(status.id, {
                     id: status.id,
                     stacks: existing.stacks + status.stacks,
                     duration: Math.max(existing.duration, status.duration),
+                    sourceFireDamage: existing.sourceFireDamage || statusEffect.sourceFireDamage,
+                    sourcePoisonDamage: existing.sourcePoisonDamage || statusEffect.sourcePoisonDamage,
+                    sourceIntelligence: existing.sourceIntelligence || statusEffect.sourceIntelligence,
+                    burnDamageBonus: existing.burnDamageBonus || statusEffect.burnDamageBonus,
+                    poisonDamageBonus: existing.poisonDamageBonus || statusEffect.poisonDamageBonus,
                   });
                 } else {
-                  entity.statusEffects.set(status.id, {
-                    id: status.id,
-                    stacks: status.stacks,
-                    duration: status.duration,
-                  });
+                  entity.statusEffects.set(status.id, statusEffect);
                 }
               });
             }
@@ -417,6 +453,22 @@ export class CombatService {
             // Bleed deals 10% of max HP per tick, multiplied by stacks
             const baseDamage = Math.max(1, Math.floor(entity.maxHp * 0.1));
             statusDamage = baseDamage * status.stacks;
+          } else if (statusId === 'burn' && status.sourceFireDamage !== undefined && status.sourceIntelligence !== undefined) {
+            // Burn DoT: (FireDamage * 0.4) * (1 + INT * 0.01 + BurnDamageBonus) * stacks
+            const fireDamage = status.sourceFireDamage;
+            const int = status.sourceIntelligence;
+            const burnBonus = status.burnDamageBonus || 0;
+            const baseTick = fireDamage * 0.4;
+            const scaling = 1 + (int * 0.01) + burnBonus;
+            statusDamage = Math.max(1, Math.floor(baseTick * scaling * status.stacks));
+          } else if (statusId === 'poison' && status.sourcePoisonDamage !== undefined && status.sourceIntelligence !== undefined) {
+            // Poison DoT: (PoisonDamage * 0.25) * (1 + INT * 0.015 + PoisonDamageBonus) * stacks
+            const poisonDamage = status.sourcePoisonDamage;
+            const int = status.sourceIntelligence;
+            const poisonBonus = status.poisonDamageBonus || 0;
+            const baseTick = poisonDamage * 0.25;
+            const scaling = 1 + (int * 0.015) + poisonBonus;
+            statusDamage = Math.max(1, Math.floor(baseTick * scaling * status.stacks));
           }
           
           // Apply status damage if any

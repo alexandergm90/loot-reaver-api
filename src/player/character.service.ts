@@ -24,7 +24,8 @@ export class CharacterService {
     // Determine attack type from weapon
     const weapon = character.items.find((i) => i.slot === 'weapon');
     const baseStats = weapon?.template?.baseStats as any;
-    const attackType = baseStats?.attackType || 'smashes';
+    const bonuses = weapon?.bonuses as any;
+    const attackType = baseStats?.attackType || bonuses?.primary?.attackType || 'smashes';
 
     const derivedStats = this.computeDerivedStats(character.items, character.level, attackType);
 
@@ -125,7 +126,8 @@ export class CharacterService {
           });
           const weapon = equipped.find((i) => i.slot === 'weapon');
           const baseStats = weapon?.template?.baseStats as any;
-          const attackType = baseStats?.attackType || 'smashes';
+          const bonuses = weapon?.bonuses as any;
+          const attackType = baseStats?.attackType || bonuses?.primary?.attackType || 'smashes';
           const derivedStats = this.computeDerivedStats(equipped, character?.level || 1, attackType);
           return this.formatEquippedResponse(equipped, derivedStats);
         }
@@ -272,7 +274,8 @@ export class CharacterService {
 
       const weapon = equipped.find((i) => i.slot === 'weapon');
       const baseStats = weapon?.template?.baseStats as any;
-      const attackType = baseStats?.attackType || 'smashes';
+      const bonuses = weapon?.bonuses as any;
+      const attackType = baseStats?.attackType || bonuses?.primary?.attackType || 'smashes';
       const derivedStats = this.computeDerivedStats(equipped, character?.level || 1, attackType);
 
       return this.formatEquippedResponse(equipped, derivedStats);
@@ -335,7 +338,8 @@ export class CharacterService {
 
       const weapon = equipped.find((i) => i.slot === 'weapon');
       const baseStats = weapon?.template?.baseStats as any;
-      const attackType = baseStats?.attackType || 'smashes';
+      const bonuses = weapon?.bonuses as any;
+      const attackType = baseStats?.attackType || bonuses?.primary?.attackType || 'smashes';
       const derivedStats = this.computeDerivedStats(equipped, character?.level || 1, attackType);
 
       return this.formatEquippedResponse(equipped, derivedStats);
@@ -366,18 +370,22 @@ export class CharacterService {
       physicalDamageMin: derivedStats.physicalDamageMin,
       physicalDamageMax: derivedStats.physicalDamageMax,
       elementalDamage: derivedStats.elementalDamage,
+      fireDamage: derivedStats.fireDamage,
+      lightningDamage: derivedStats.lightningDamage,
+      poisonDamage: derivedStats.poisonDamage,
       totalDamageMin: derivedStats.totalDamageMin,
       totalDamageMax: derivedStats.totalDamageMax,
       
       // Defense stats
       critChance: derivedStats.critChance,
       critMultiplier: derivedStats.critMultiplier,
+      spellCritChance: derivedStats.spellCritChance,
       dodgeChance: derivedStats.dodgeChance,
+      blockChance: derivedStats.blockChance,
       physicalReduction: derivedStats.physicalReduction,
       
       // Spell stats
-      ...(derivedStats.spellDamage !== undefined && { spellDamage: derivedStats.spellDamage }),
-      ...(derivedStats.spellProcChance !== undefined && { spellProcChance: derivedStats.spellProcChance }),
+      ...(derivedStats.spells !== undefined && { spells: derivedStats.spells }),
       
       // Status proc chances
       ...(derivedStats.burnChance !== undefined && { burnChance: derivedStats.burnChance }),

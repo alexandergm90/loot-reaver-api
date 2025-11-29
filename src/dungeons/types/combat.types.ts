@@ -3,6 +3,12 @@ export interface StatusEffect {
   id: string;
   stacks: number;
   duration: number;
+  // Source damage values for DoT calculation
+  sourceFireDamage?: number;      // Fire damage that applied this burn
+  sourcePoisonDamage?: number;    // Poison damage that applied this poison
+  sourceIntelligence?: number;    // INT of the attacker
+  burnDamageBonus?: number;       // Bonus to burn DoT damage
+  poisonDamageBonus?: number;     // Bonus to poison DoT damage
 }
 
 export interface CombatEntity {

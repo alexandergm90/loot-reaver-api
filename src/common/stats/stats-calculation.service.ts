@@ -1,11 +1,37 @@
 import { Injectable } from '@nestjs/common';
 import { RawCharacterStats, DerivedCharacterStats, AttackResult } from './stats.types';
 
+// Spell-to-element mapping - easily extensible for new spells
+const SPELL_ELEMENT_MAP: Record<string, 'fire' | 'lightning' | 'poison'> = {
+  fireball: 'fire',
+  arcBolt: 'lightning',
+  toxicBolt: 'poison',
+};
+
+// Spell-specific scaling values - easily extensible for new spells
+const SPELL_SCALING: Record<string, { intScaling: number; elementScaling: number }> = {
+  fireball: { intScaling: 0.7, elementScaling: 1.0 },
+  arcBolt: { intScaling: 0.5, elementScaling: 0.8 },
+  toxicBolt: { intScaling: 0.6, elementScaling: 1.2 },
+};
+
 @Injectable()
 export class StatsCalculationService {
   // Random number generator
   private rng(): number {
     return Math.random();
+  }
+
+  // Type guard for spell data
+  private isValidSpellData(data: unknown): data is { chance: number; damage: number } {
+    return (
+      data !== null &&
+      typeof data === 'object' &&
+      'chance' in data &&
+      'damage' in data &&
+      typeof (data as any).chance === 'number' &&
+      typeof (data as any).damage === 'number'
+    );
   }
 
   /**
@@ -24,14 +50,13 @@ export class StatsCalculationService {
       intelligence: 0,
       baseWeaponMin: 0,
       baseWeaponMax: 0,
-      attackFlat: 0,
-      attackPercent: 0,
       fireFlat: 0,
       lightningFlat: 0,
       poisonFlat: 0,
       critChanceBonus: 0,
       critDamageBonus: 0,
       dodgeChanceBonus: 0,
+      blockChanceBonus: 0,
     };
 
     // Filter weapons
@@ -92,9 +117,10 @@ export class StatsCalculationService {
     // For dual-wield, off-hand typically does less damage (50% for off-hand)
     const offHandMultiplier = isOffHand ? 0.5 : 1.0;
 
-    // Get weapon damage from bonuses.minAttack/maxAttack, fallback to baseStats.attack
-    let weaponMin = bonuses.minAttack;
-    let weaponMax = bonuses.maxAttack;
+    // Get weapon damage from bonuses.primary.minAttack/maxAttack, fallback to baseStats.attack
+    const primary = bonuses.primary || {};
+    let weaponMin = primary.minAttack;
+    let weaponMax = primary.maxAttack;
 
     // If bonuses don't have minAttack/maxAttack, use baseStats.attack (template definition)
     if (weaponMin === undefined && weaponMax === undefined) {
@@ -115,7 +141,8 @@ export class StatsCalculationService {
     raw.baseWeaponMax += weaponMax;
 
     // Aggregate other weapon stats (but skip attack-related stats since we handled them above)
-    this.aggregateItemStats(weapon, raw, offHandMultiplier);
+    // For offhand weapons, skip spells (spells only proc from mainhand or two-handed weapons)
+    this.aggregateItemStats(weapon, raw, offHandMultiplier, isOffHand);
   }
 
   /**
@@ -124,9 +151,9 @@ export class StatsCalculationService {
   private aggregateItemStats(
     item: any,
     raw: RawCharacterStats,
-    multiplier: number = 1.0
+    multiplier: number = 1.0,
+    skipSpells: boolean = false
   ): void {
-    const baseStats = item.template?.baseStats || {};
     const bonuses = item.bonuses || {};
 
     // Helper to add stat with multiplier
@@ -136,57 +163,84 @@ export class StatsCalculationService {
       }
     };
 
-    // Primary stats - only from bonuses
-    addStat('health', bonuses.health || bonuses.hp || 0);
-    addStat('armor', bonuses.armor || 0);
-    addStat('strength', bonuses.strength || 0);
-    addStat('dexterity', bonuses.dexterity || 0);
-    addStat('intelligence', bonuses.intelligence || 0);
+    // Read from nested structure
+    const primary = bonuses.primary || {};
+    const attributes = bonuses.attributes || {};
+    const elementPower = bonuses.elementPower || {};
+    const special = bonuses.special || {};
+    const spells = bonuses.spells || {};
 
-    // Attack stats - only from bonuses
-    addStat('attackFlat', bonuses.attackFlat || 0);
-    if (bonuses.attackPercent !== undefined) {
-      raw.attackPercent += bonuses.attackPercent;
-    }
+    // Primary stats - from bonuses.primary
+    addStat('health', primary.health || 0);
+    addStat('armor', primary.armor || 0);
 
-    // Elemental stats - only from bonuses (fire, lightning, poison)
-    addStat('fireFlat', bonuses.fire || 0);
-    addStat('lightningFlat', bonuses.lightning || 0);
-    addStat('poisonFlat', bonuses.poison || 0);
+    // Attributes - from bonuses.attributes
+    addStat('strength', attributes.strength || 0);
+    addStat('dexterity', attributes.dexterity || 0);
+    addStat('intelligence', attributes.intelligence || 0);
 
-    // Crit stats - only from bonuses
-    if (bonuses.critChance !== undefined) {
-      raw.critChanceBonus += bonuses.critChance;
-    }
-    if (bonuses.critDamage !== undefined) {
-      raw.critDamageBonus += bonuses.critDamage;
-    }
+    // Elemental stats - from bonuses.elementPower
+    addStat('fireFlat', elementPower.fire || 0);
+    addStat('lightningFlat', elementPower.lightning || 0);
+    addStat('poisonFlat', elementPower.poison || 0);
 
-    // Dodge stats - only from bonuses
-    if (bonuses.dodgeChance !== undefined) {
-      raw.dodgeChanceBonus += bonuses.dodgeChance;
+    // Special stats - from bonuses.special
+    if (special.critChance !== undefined) {
+      raw.critChanceBonus += special.critChance;
     }
-
-    // Spell stats - only from bonuses
-    if (bonuses.spellBaseDamage !== undefined) {
-      raw.spellBaseDamage = (raw.spellBaseDamage || 0) + bonuses.spellBaseDamage * multiplier;
+    if (special.critDamage !== undefined) {
+      raw.critDamageBonus += special.critDamage;
     }
-    if (bonuses.spellProcChance !== undefined) {
-      raw.spellProcChance = Math.max(
-        raw.spellProcChance || 0,
-        bonuses.spellProcChance
-      );
+    if (special.dodgeChance !== undefined) {
+      raw.dodgeChanceBonus += special.dodgeChance;
     }
-    if (bonuses.spellDamageBonus !== undefined) {
-      raw.spellDamageBonus = (raw.spellDamageBonus || 0) + bonuses.spellDamageBonus * multiplier;
+    if (special.blockChance !== undefined) {
+      raw.blockChanceBonus += special.blockChance;
     }
 
-    // Status effect bonuses - only from bonuses
+    // Spells - from bonuses.spells (skip if this is an offhand weapon)
+    if (!skipSpells) {
+      // Initialize spells object if not exists
+      if (!raw.spells) {
+        raw.spells = {};
+      }
+
+      // Process each spell in bonuses.spells
+      for (const [spellName, spellData] of Object.entries(spells)) {
+        if (this.isValidSpellData(spellData)) {
+          const element = SPELL_ELEMENT_MAP[spellName] || 'fire'; // Default to fire if not mapped
+          const existingSpell = raw.spells[spellName];
+          
+          if (existingSpell) {
+            // Use highest chance, sum damage
+            raw.spells[spellName] = {
+              chance: Math.max(existingSpell.chance, spellData.chance),
+              damage: existingSpell.damage + spellData.damage * multiplier,
+              element: existingSpell.element, // Keep first element
+            };
+          } else {
+            raw.spells[spellName] = {
+              chance: spellData.chance,
+              damage: spellData.damage * multiplier,
+              element,
+            };
+          }
+        }
+      }
+    }
+
+    // Status effect bonuses - keep in flat structure for now
     if (bonuses.burnChance !== undefined) {
       raw.burnChanceBonus = (raw.burnChanceBonus || 0) + bonuses.burnChance * multiplier;
     }
+    if (bonuses.burnDamage !== undefined) {
+      raw.burnDamageBonus = (raw.burnDamageBonus || 0) + bonuses.burnDamage * multiplier;
+    }
     if (bonuses.poisonChance !== undefined) {
       raw.poisonChanceBonus = (raw.poisonChanceBonus || 0) + bonuses.poisonChance * multiplier;
+    }
+    if (bonuses.poisonDamage !== undefined) {
+      raw.poisonDamageBonus = (raw.poisonDamageBonus || 0) + bonuses.poisonDamage * multiplier;
     }
     if (bonuses.stunChance !== undefined) {
       raw.stunChanceBonus = (raw.stunChanceBonus || 0) + bonuses.stunChance * multiplier;
@@ -207,20 +261,23 @@ export class StatsCalculationService {
     // Armor: base 0 + from gear
     const armor = rawStats.armor;
 
-    // Physical Attack: (BaseWeaponDamage + AttackFlat) * (1 + STR * 0.02) * (1 + AttackPercent)
+    // Physical Attack: BaseWeaponDamage * (1 + STR * 0.02)
     const strengthScaling = 1 + rawStats.strength * 0.02;
-    const physicalBaseMin = (rawStats.baseWeaponMin + rawStats.attackFlat) * strengthScaling;
-    const physicalBaseMax = (rawStats.baseWeaponMax + rawStats.attackFlat) * strengthScaling;
-    const physicalDamageMin = physicalBaseMin * (1 + rawStats.attackPercent);
-    const physicalDamageMax = physicalBaseMax * (1 + rawStats.attackPercent);
+    const physicalDamageMin = rawStats.baseWeaponMin * strengthScaling;
+    const physicalDamageMax = rawStats.baseWeaponMax * strengthScaling;
 
     // Elemental Damage: (FireFlat + LightningFlat + PoisonFlat) * (1 + INT * 0.02)
-    const elementalFlat = rawStats.fireFlat + rawStats.lightningFlat + rawStats.poisonFlat;
     const elementalScaling = 1 + rawStats.intelligence * 0.02;
-    const elementalDamage = elementalFlat * elementalScaling;
+    const fireDamage = rawStats.fireFlat * elementalScaling;
+    const lightningDamage = rawStats.lightningFlat * elementalScaling;
+    const poisonDamage = rawStats.poisonFlat * elementalScaling;
+    const elementalDamage = fireDamage + lightningDamage + poisonDamage;
 
     // Crit Chance: 0.05 + CritFromDex + CritChanceBonus (with soft cap)
     const critChance = this.calcCritChance(rawStats, characterLevel);
+
+    // Spell Crit Chance: 0.05 + CritFromInt + CritChanceBonus (with soft cap)
+    const spellCritChance = this.calcSpellCritChance(rawStats, characterLevel);
 
     // Crit Multiplier: 1.5 + CritDamageBonus
     const critMultiplier = 1.5 + rawStats.critDamageBonus;
@@ -228,16 +285,48 @@ export class StatsCalculationService {
     // Dodge Chance: 0.02 + DodgeFromDex + DodgeChanceBonus (with soft cap)
     const dodgeChance = this.calcDodgeChance(rawStats, characterLevel);
 
+    // Block Chance: 0.01 + BlockFromStr + BlockChanceBonus (with soft cap, 2x lower than dodge)
+    const blockChance = this.calcBlockChance(rawStats, characterLevel);
+
     // Physical Reduction: Armor / (Armor + 50 + 5 * AttackerLevel)
     // Note: This is calculated per-attack based on attacker level, so we'll provide a helper
     // For display purposes, we can calculate against a typical enemy level (e.g., character level)
     const physicalReduction = this.physicalReduction(armor, characterLevel);
 
-    // Spell Damage
-    let spellDamage: number | undefined;
-    if (rawStats.spellBaseDamage) {
-      const spellScaling = 1 + (rawStats.intelligence * 0.03) + (rawStats.spellDamageBonus || 0);
-      spellDamage = rawStats.spellBaseDamage * spellScaling;
+    // Spells - calculate damage for each spell and keep the full map
+    const calculatedSpells: Record<string, { chance: number; damage: number; element: 'fire' | 'lightning' | 'poison' }> = {};
+    
+    if (rawStats.spells && Object.keys(rawStats.spells).length > 0) {
+      for (const [spellName, spellData] of Object.entries(rawStats.spells)) {
+        // Get spell-specific scaling values
+        const scaling = SPELL_SCALING[spellName] || { intScaling: 0.5, elementScaling: 1.0 };
+        
+        // Calculate spell damage with spell-specific scaling:
+        // Base spell damage scaled by INT with spell-specific intScaling
+        const spellBaseScaling = 1 + rawStats.intelligence * scaling.intScaling;
+        const scaledBaseDamage = spellData.damage * spellBaseScaling;
+        
+        // Elemental power scaled by standard INT scaling (0.02) then by spell-specific elementScaling
+        const elementalIntScaling = 1 + rawStats.intelligence * 0.02;
+        let elementalBonus = 0;
+        
+        if (spellData.element === 'fire') {
+          elementalBonus = rawStats.fireFlat * elementalIntScaling * scaling.elementScaling;
+        } else if (spellData.element === 'lightning') {
+          elementalBonus = rawStats.lightningFlat * elementalIntScaling * scaling.elementScaling;
+        } else if (spellData.element === 'poison') {
+          elementalBonus = rawStats.poisonFlat * elementalIntScaling * scaling.elementScaling;
+        }
+        
+        // Spell damage = (base spell damage * spell int scaling) + (elemental power * standard int scaling * spell element scaling)
+        const finalSpellDamage = scaledBaseDamage + elementalBonus;
+        
+        calculatedSpells[spellName] = {
+          chance: spellData.chance,
+          damage: finalSpellDamage,
+          element: spellData.element,
+        };
+      }
     }
 
     // Status proc chances
@@ -258,18 +347,24 @@ export class StatsCalculationService {
       physicalDamageMin: roundedPhysicalMin,
       physicalDamageMax: roundedPhysicalMax,
       elementalDamage: roundedElemental,
+      fireDamage: Math.round(fireDamage),
+      lightningDamage: Math.round(lightningDamage),
+      poisonDamage: Math.round(poisonDamage),
       // Always include totalDamage for consistency (even if elemental is 0)
       totalDamageMin: roundedPhysicalMin + roundedElemental,
       totalDamageMax: roundedPhysicalMax + roundedElemental,
       critChance,
       critMultiplier,
+      spellCritChance,
       dodgeChance,
+      blockChance,
       physicalReduction,
-      spellDamage: spellDamage ? Math.round(spellDamage) : undefined,
-      spellProcChance: rawStats.spellProcChance,
+      spells: Object.keys(calculatedSpells).length > 0 ? calculatedSpells : undefined,
       burnChance,
       poisonChance,
       stunChance,
+      burnDamageBonus: rawStats.burnDamageBonus,
+      poisonDamageBonus: rawStats.poisonDamageBonus,
       attackType,
     };
   }
@@ -291,6 +386,23 @@ export class StatsCalculationService {
   }
 
   /**
+   * Calculates spell crit chance with soft cap based on INT and level
+   * Same formula as physical crit but uses intelligence instead of dexterity
+   */
+  calcSpellCritChance(stats: RawCharacterStats, level: number): number {
+    const baseCrit = 0.05;
+    const maxFromInt = 0.35;
+    const scale = 5;
+    const offset = 10;
+
+    const fromInt = maxFromInt * (
+      stats.intelligence / (stats.intelligence + scale * level + offset)
+    );
+
+    return Math.min(1.0, baseCrit + fromInt + stats.critChanceBonus);
+  }
+
+  /**
    * Calculates dodge chance with soft cap based on DEX and level
    */
   calcDodgeChance(stats: RawCharacterStats, level: number): number {
@@ -304,6 +416,23 @@ export class StatsCalculationService {
     );
 
     return Math.min(1.0, baseDodge + fromDex + stats.dodgeChanceBonus);
+  }
+
+  /**
+   * Calculates block chance with soft cap based on STR and level
+   * Uses 2x lower caps than dodge (half the percentage)
+   */
+  calcBlockChance(stats: RawCharacterStats, level: number): number {
+    const baseBlock = 0.01; // 1% base (half of dodge's 2%)
+    const maxFromStr = 0.125; // 12.5% max from STR (half of dodge's 25%)
+    const scale = 5;
+    const offset = 10;
+
+    const fromStr = maxFromStr * (
+      stats.strength / (stats.strength + scale * level + offset)
+    );
+
+    return Math.min(1.0, baseBlock + fromStr + stats.blockChanceBonus);
   }
 
   /**
@@ -384,11 +513,28 @@ export class StatsCalculationService {
     const reduction = this.physicalReduction(defenderStats.armor, attackerLevel);
     const physicalAfterArmor = physicalBase * (1 - reduction);
 
-    // 5. Spell proc check
+    // 5. Spell proc check - roll for each spell and use the first one that procs
     let spellDamage = 0;
-    if (attackerStats.spellProcChance && this.rng() < attackerStats.spellProcChance) {
-      spellProc = true;
-      spellDamage = attackerStats.spellDamage || 0;
+    let spellName: string | undefined;
+    let spellCrit = false;
+    
+    if (attackerStats.spells && Object.keys(attackerStats.spells).length > 0) {
+      // Roll for each spell in order, use the first one that procs
+      for (const [spellNameKey, spell] of Object.entries(attackerStats.spells)) {
+        if (this.rng() < spell.chance) {
+          spellProc = true;
+          spellDamage = spell.damage;
+          spellName = spellNameKey;
+          
+          // Check for spell crit (based on intelligence)
+          if (this.rng() < attackerStats.spellCritChance) {
+            spellCrit = true;
+            spellDamage = spellDamage * attackerStats.critMultiplier;
+          }
+          
+          break; // Use first spell that procs
+        }
+      }
     }
 
     // 6. Elemental Status Effects
@@ -404,12 +550,14 @@ export class StatsCalculationService {
     return {
       hit,
       crit,
+      spellCrit: spellCrit || undefined,
       physicalDamage: Math.round(physicalAfterArmor),
       elementalDamage: Math.round(elemental),
       spellDamage: Math.round(spellDamage),
       totalDamage,
       statuses,
       spellProc,
+      spellName,
     };
   }
 
