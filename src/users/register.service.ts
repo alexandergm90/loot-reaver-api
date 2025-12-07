@@ -47,8 +47,8 @@ export class RegisterService {
 
         resources: {
           create: {
-            gold: 100,
-            scrap: 50,
+            gold: 0,
+            shards: 0,
             // Initialize rune system: base 4 capacity, full runes on start
             runeCapacityBase: 4,
             runeCapacityBonus: 0,
@@ -56,7 +56,6 @@ export class RegisterService {
             runeRegenMultiplier: 1000,
             runeRegenAddSeconds: 0,
             runes: 4,
-            mirrorShards: 0,
           },
         },
 

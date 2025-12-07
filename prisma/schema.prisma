@@ -112,6 +112,7 @@ model ItemTemplate {
   id         String     @id @default(uuid())
   code       String     // e.g., "wooden_sword" - can be shared across items with same image
   name       String
+  description String?
   slot       ItemSlot
   baseStats  Json
   iconUrl    String
@@ -147,11 +148,9 @@ model CharacterResources {
   character   Character @relation(fields: [characterId], references: [id])
   characterId String    @unique
 
-  gold         Int @default(0)
-  scrap        Int @default(0)
-  soulstones   Int @default(0)
-  pvpTokens    Int @default(0)
-  mirrorShards Int @default(0)
+  gold      Int @default(0)
+  shards    Int @default(0)
+  pvpTokens Int @default(0)
 
   runes                Int @default(0)
   // Base capacity for runes (default 4) and any bonuses (premium, skills, etc.)
@@ -163,9 +162,8 @@ model CharacterResources {
   runeRegenMultiplier  Int @default(1000)
   runeRegenAddSeconds  Int @default(0)
 
-  runesUpdatedAt      DateTime @default(now())
-  soulstonesUpdatedAt DateTime @default(now())
-  pvpUpdatedAt        DateTime @default(now())
+  runesUpdatedAt DateTime @default(now())
+  pvpUpdatedAt   DateTime @default(now())
 
   @@index([characterId])
 }

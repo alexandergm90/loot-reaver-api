@@ -42,10 +42,8 @@ Authorization: Bearer <jwt_token>
     "id": "resources-uuid",
     "characterId": "char-uuid-123",
     "gold": 5000,
-    "scrap": 100,
-    "soulstones": 25,
+    "shards": 125,
     "pvpTokens": 0,
-    "mirrorShards": 0,
     "runes": 3,
     "runeCapacityBase": 4,
     "runeCapacityBonus": 0,
@@ -53,7 +51,6 @@ Authorization: Bearer <jwt_token>
     "runeRegenMultiplier": 1000,
     "runeRegenAddSeconds": 0,
     "runesUpdatedAt": "2025-01-18T10:00:00.000Z",
-    "soulstonesUpdatedAt": "2025-01-18T10:00:00.000Z",
     "pvpUpdatedAt": "2025-01-18T10:00:00.000Z"
   },
   "items": [

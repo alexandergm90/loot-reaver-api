@@ -15,14 +15,14 @@ export interface TopbarData {
 	expInCurrentLevel: number;
 	expRequiredForNextLevel: number;
 	gold: number;
-	scrap: number;
+	shards: number;
 	runes: RuneStatus;
 }
 
 const resourceSelect = {
 	id: true,
 	gold: true,
-	scrap: true,
+	shards: true,
 	runes: true,
 	runesUpdatedAt: true,
 	runeCapacityBase: true,
@@ -146,7 +146,7 @@ export class TopbarService {
 			expInCurrentLevel: lp.expInCurrentLevel,
 			expRequiredForNextLevel: lp.expRequiredForNextLevel,
 			gold: r.gold,
-			scrap: r.scrap,
+			shards: r.shards,
 			runes: {
 				current: newRunes,
 				capacity,
