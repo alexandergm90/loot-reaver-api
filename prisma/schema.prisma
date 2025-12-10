@@ -134,7 +134,7 @@ model CharacterItem {
   equipped      Boolean  @default(false)
   equippedHand  String? // "left" | "right" | null (for weapons, rings, shields)
   isTwoHanded   Boolean  @default(false)
-  durability    Int      @default(100)
+  power         Int      @default(100)
   socketedRunes Json?
   bonuses       Json? // dynamic modifiers
 

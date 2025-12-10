@@ -65,7 +65,7 @@ export class CharacterService {
       id: i.id,
       slot: i.slot,
       rarity: i.rarity,
-      durability: i.durability,
+      power: i.power,
       template: i.template,
     }));
   }
@@ -89,7 +89,7 @@ export class CharacterService {
       equipped: item.equipped,
       equippedHand: item.equippedHand,
       isTwoHanded: item.isTwoHanded || item.template.isTwoHanded,
-      durability: item.durability,
+      power: item.power,
       socketedRunes: item.socketedRunes,
       bonuses: item.bonuses,
       createdAt: item.createdAt,

@@ -123,7 +123,7 @@ Authorization: Bearer <jwt_token>
     "id": "item-uuid-3",
     "slot": "weapon",
     "rarity": "worn",
-    "durability": 100,
+    "power": 100,
     "template": {
       "id": "template-uuid-1",
       "code": "basic_sword",
@@ -142,7 +142,7 @@ Authorization: Bearer <jwt_token>
     "id": "item-uuid-4",
     "slot": "ring",
     "rarity": "heroic",
-    "durability": 100,
+    "power": 100,
     "template": {
       "id": "template-uuid-5",
       "code": "magic_ring",
@@ -185,7 +185,7 @@ Authorization: Bearer <jwt_token>
   "slot": "weapon",
   "rarity": "superior",
   "equipped": true,
-  "durability": 100,
+  "power": 100,
   "socketedRunes": null,
   "bonuses": {
     "damage": 2,
