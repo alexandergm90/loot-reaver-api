@@ -8,6 +8,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { RegisterModule } from '@/users/register.module';
 import { PlayerModule } from '@/player/player.module';
 import { DungeonsModule } from './dungeons/dungeons.module';
+import { ForgeModule } from './forge/forge.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { DungeonsModule } from './dungeons/dungeons.module';
     RegisterModule,
     PlayerModule,
     DungeonsModule,
+    ForgeModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '7d' },
